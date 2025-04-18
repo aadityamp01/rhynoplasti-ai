@@ -3,6 +3,8 @@ import numpy as np
 from PIL import Image
 import io
 import os
+import json
+import tempfile
 
 try:
     import cv2
@@ -13,6 +15,26 @@ try:
 except ImportError as e:
     st.error(f"Error importing required libraries: {str(e)}")
     OPENCV_AVAILABLE = False
+
+# Function to set up Google Cloud credentials from Streamlit secrets
+def setup_google_credentials():
+    try:
+        # Check if credentials are in Streamlit secrets
+        if 'google_credentials' in st.secrets:
+            # Create a temporary file to store the credentials
+            with tempfile.NamedTemporaryFile(mode='w', delete=False, suffix='.json') as temp_file:
+                json.dump(st.secrets['google_credentials'], temp_file)
+                temp_file_path = temp_file.name
+            
+            # Set the environment variable
+            os.environ['GOOGLE_APPLICATION_CREDENTIALS'] = temp_file_path
+            return True
+        else:
+            st.error("Google Cloud credentials not found in Streamlit secrets.")
+            return False
+    except Exception as e:
+        st.error(f"Error setting up Google Cloud credentials: {str(e)}")
+        return False
 
 def detect_nose_landmarks(image):
     if not OPENCV_AVAILABLE:
@@ -94,6 +116,11 @@ def main():
     
     if not OPENCV_AVAILABLE:
         st.error("Required libraries are not available. Please check the installation.")
+        return
+    
+    # Set up Google Cloud credentials
+    if not setup_google_credentials():
+        st.error("Failed to set up Google Cloud credentials. Please check your Streamlit secrets.")
         return
     
     # File uploader
