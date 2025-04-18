@@ -21,12 +21,15 @@ def setup_google_credentials():
     try:
         # Check if credentials are in Streamlit secrets
         if 'google_credentials' in st.secrets:
-            # Check if it's a dictionary (TOML format) or a string (JSON format)
-            if isinstance(st.secrets['google_credentials'], dict):
-                # TOML format - already a dictionary
+            # Handle different types of secrets objects
+            if hasattr(st.secrets['google_credentials'], '__dict__'):
+                # AttrDict object (from TOML)
+                credentials = dict(st.secrets['google_credentials'])
+            elif isinstance(st.secrets['google_credentials'], dict):
+                # Dictionary
                 credentials = st.secrets['google_credentials']
             else:
-                # JSON format - parse the string
+                # String (JSON)
                 credentials = json.loads(st.secrets['google_credentials'])
             
             # Create a temporary file to store the credentials
@@ -38,8 +41,8 @@ def setup_google_credentials():
             os.environ['GOOGLE_APPLICATION_CREDENTIALS'] = temp_file_path
             
             # Set project ID if available
-            if 'google_cloud_project' in st.secrets and 'project_id' in st.secrets['google_cloud_project']:
-                os.environ['GOOGLE_CLOUD_PROJECT'] = st.secrets['google_cloud_project']['project_id']
+            if 'google_cloud_project' in st.secrets and hasattr(st.secrets['google_cloud_project'], 'project_id'):
+                os.environ['GOOGLE_CLOUD_PROJECT'] = st.secrets['google_cloud_project'].project_id
             elif 'project_id' in credentials:
                 os.environ['GOOGLE_CLOUD_PROJECT'] = credentials['project_id']
                 
