@@ -33,7 +33,9 @@ env/
 
 # Google Cloud
 *.json
+*.toml
 !package.json
+!.streamlit/config.toml
 
 # Environment variables
 .env
