@@ -17,8 +17,9 @@
         .container {
             position: relative;
             width: 100%;
-            max-width: 640px;
+            max-width: 800px;
             margin: 0 auto;
+            padding: 20px;
         }
         .header {
             text-align: center;
@@ -31,68 +32,55 @@
             color: #7f8c8d;
             font-size: 1.2em;
         }
-        .simulator-container {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 20px;
-            justify-content: center;
-        }
         .video-container {
-            width: 640px;
-            height: 480px;
-            background-color: #fff;
-            border-radius: 10px;
-            overflow: hidden;
-            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
             position: relative;
-        }
-        .video-container video {
             width: 100%;
-            height: 100%;
-            object-fit: cover;
+            max-width: 640px;
+            margin: 0 auto;
+        }
+        #video, #canvas {
+            width: 100%;
+            height: auto;
+            border-radius: 8px;
         }
         .controls {
-            position: absolute;
-            bottom: 20px;
-            left: 0;
-            right: 0;
+            margin-top: 20px;
             display: flex;
-            justify-content: center;
             gap: 10px;
-            padding: 10px;
-            background: rgba(0, 0, 0, 0.5);
+            justify-content: center;
         }
-        .control-group {
+        .mode-switch {
             margin-bottom: 20px;
+            text-align: center;
         }
-        .control-group label {
-            display: block;
-            margin-bottom: 8px;
-            font-weight: bold;
-            color: #2c3e50;
+        #permission-message {
+            display: none;
+            color: red;
+            text-align: center;
+            margin: 10px 0;
         }
-        select, button {
-            width: 100%;
-            padding: 10px;
-            border-radius: 5px;
-            border: 1px solid #ddd;
-            margin-bottom: 10px;
+        .effect-buttons {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            justify-content: center;
+            margin-top: 20px;
         }
         button {
-            background-color: #4CAF50;
-            color: white;
+            padding: 8px 16px;
+            border-radius: 4px;
             border: none;
+            background-color: #007bff;
+            color: white;
             cursor: pointer;
-            font-weight: bold;
+            transition: background-color 0.3s;
         }
         button:hover {
-            background-color: #45a049;
+            background-color: #0056b3;
         }
-        .slider-container {
-            margin-top: 10px;
-        }
-        .slider {
-            width: 100%;
+        button:disabled {
+            background-color: #ccc;
+            cursor: not-allowed;
         }
         .result-container {
             margin-top: 20px;
@@ -197,121 +185,137 @@
 <body>
     <div class="container">
         <div class="header">
-            <h1>AI Rhinoplasty Simulator</h1>
+            <h1>AR Rhinoplasty Simulator</h1>
             <p>Experience how you might look after rhinoplasty using advanced AI technology</p>
         </div>
         
-        <div id="video-container"></div>
-        
         <div class="mode-switch">
-            <button id="camera-mode" class="active">Camera</button>
-            <button id="upload-mode">Upload</button>
+            <button id="camera-mode" class="active">Camera Mode</button>
+            <button id="upload-mode">Upload Image</button>
+            <input type="file" id="image-upload" accept="image/*" style="display: none;">
         </div>
         
-        <div id="permission-message" class="permission-message">
-            Please allow camera access to use the AR simulator.
+        <div id="permission-message">
+            Camera permission is required for AR simulation. Please allow camera access.
         </div>
         
-        <div id="upload-container" class="upload-container">
-            <h3>Upload Image</h3>
-            <label for="image-upload">Choose Image</label>
-            <input type="file" id="image-upload" accept="image/*">
+        <div class="video-container" id="ar-container"></div>
+        
+        <div class="effect-buttons">
+            <button id="natural-refinement">Natural Refinement</button>
+            <button id="bridge-reduction">Bridge Reduction</button>
+            <button id="tip-refinement">Tip Refinement</button>
+            <button id="nose-narrowing">Nose Narrowing</button>
+            <button id="crooked-correction">Crooked Correction</button>
+            <button id="combined-enhancement">Combined Enhancement</button>
         </div>
         
         <div class="controls">
-            <button id="capture">Capture</button>
+            <button id="capture">Capture Image</button>
             <button id="reset">Reset</button>
         </div>
         
         <div class="result-container" id="result-container" style="display: none;">
             <h2>Your Rhinoplasty Result</h2>
             <img id="result-image" class="result-image" src="" alt="Rhinoplasty Result">
-            <a id="download-btn" class="download-btn" download="rhinoplasty_result.png">Download Result</a>
+            <a id="download-btn" class="download-btn" download="rhinoplasty-result.png">Download Result</a>
         </div>
     </div>
 
+    <!-- Banuba SDK -->
+    <script src="https://sdk.banuba.com/ar/1.0.0/banuba-ar.js"></script>
+    
+    <!-- AR Integration -->
     <script type="module">
-        import ARRhinoplastySimulator from './ar_integration.js';
-        
+        import { ARRhinoplastySimulator } from './ar_integration.js';
+
         let simulator = null;
-        let currentMode = 'camera';
-        
+        const clientToken = window.BANUBA_CLIENT_TOKEN || 'YOUR_CLIENT_TOKEN'; // Replace with your token
+
         // Initialize simulator
-        async function initSimulator() {
-            const clientToken = 'YOUR_BANUBA_CLIENT_TOKEN'; // Replace with actual token
-            simulator = new ARRhinoplastySimulator(clientToken);
-            await simulator.initialize('video-container');
+        async function initializeSimulator() {
+            try {
+                simulator = new ARRhinoplastySimulator(clientToken);
+                const success = await simulator.initialize('ar-container');
+                if (!success) {
+                    document.getElementById('permission-message').style.display = 'block';
+                }
+            } catch (error) {
+                console.error('Failed to initialize simulator:', error);
+                document.getElementById('permission-message').style.display = 'block';
+            }
         }
-        
-        // Handle mode switching
+
+        // Mode switching
         document.getElementById('camera-mode').addEventListener('click', async () => {
-            if (currentMode === 'camera') return;
-            
-            currentMode = 'camera';
+            if (simulator) {
+                await simulator.stop();
+            }
+            document.getElementById('image-upload').style.display = 'none';
             document.getElementById('camera-mode').classList.add('active');
             document.getElementById('upload-mode').classList.remove('active');
-            document.getElementById('upload-container').style.display = 'none';
-            
-            if (simulator) {
-                await simulator.stop();
-            }
-            await initSimulator();
+            await initializeSimulator();
         });
-        
+
         document.getElementById('upload-mode').addEventListener('click', () => {
-            if (currentMode === 'upload') return;
-            
-            currentMode = 'upload';
+            document.getElementById('image-upload').style.display = 'block';
             document.getElementById('upload-mode').classList.add('active');
             document.getElementById('camera-mode').classList.remove('active');
-            document.getElementById('upload-container').style.display = 'block';
-            
-            if (simulator) {
-                simulator.stop();
-            }
         });
-        
-        // Handle image upload
+
+        // Image upload handling
         document.getElementById('image-upload').addEventListener('change', async (event) => {
             const file = event.target.files[0];
-            if (!file) return;
-            
-            const reader = new FileReader();
-            reader.onload = async (e) => {
+            if (file) {
                 const img = new Image();
                 img.onload = async () => {
-                    if (!simulator) {
-                        await initSimulator();
+                    if (simulator) {
+                        await simulator.loadImage(img);
                     }
-                    await simulator.loadImage(img);
                 };
-                img.src = e.target.result;
-            };
-            reader.readAsDataURL(file);
-        });
-        
-        // Handle capture and reset
-        document.getElementById('capture').addEventListener('click', async () => {
-            if (!simulator) return;
-            
-            const imageData = await simulator.captureImage();
-            // Handle the captured image data (e.g., send to server, display, etc.)
-            console.log('Image captured:', imageData);
-        });
-        
-        document.getElementById('reset').addEventListener('click', async () => {
-            if (!simulator) return;
-            
-            if (currentMode === 'upload') {
-                simulator.resetImage();
-            } else {
-                await simulator.stop();
-                await initSimulator();
+                img.src = URL.createObjectURL(file);
             }
         });
-        
+
+        // Effect buttons
+        const effects = [
+            'natural-refinement',
+            'bridge-reduction',
+            'tip-refinement',
+            'nose-narrowing',
+            'crooked-correction',
+            'combined-enhancement'
+        ];
+
+        effects.forEach(effect => {
+            document.getElementById(effect).addEventListener('click', async () => {
+                if (simulator) {
+                    await simulator.applyEffect(effect.replace('-', ' '));
+                }
+            });
+        });
+
+        // Capture and reset
+        document.getElementById('capture').addEventListener('click', async () => {
+            if (simulator) {
+                const imageData = await simulator.captureImage();
+                if (imageData) {
+                    const link = document.createElement('a');
+                    link.download = 'rhinoplasty-result.png';
+                    link.href = imageData;
+                    link.click();
+                }
+            }
+        });
+
+        document.getElementById('reset').addEventListener('click', async () => {
+            if (simulator) {
+                simulator.resetImage();
+            }
+        });
+
         // Initialize on page load
-        window.addEventListener('load', initSimulator);
+        window.addEventListener('load', initializeSimulator);
     </script>
 </body>
 </html> 
