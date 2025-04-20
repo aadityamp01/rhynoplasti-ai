@@ -313,6 +313,9 @@
     <!-- Banuba SDK -->
     <script src="https://sdk.banuba.com/ar/1.0.0/banuba-ar.js"></script>
     
+    <!-- FaceMorph SDK -->
+    <script src="https://cdn.jsdelivr.net/npm/facemorph@1.0.0/dist/facemorph.min.js"></script>
+    
     <!-- AR Integration -->
     <script type="module">
         import { Player, Module, Effect, Dom, ImageCapture } from "https://cdn.jsdelivr.net/npm/@banuba/webar/dist/BanubaSDK.browser.esm.js";
@@ -324,6 +327,7 @@
         let isProcessing = false;
         let canvas = null;
         let ctx = null;
+        let faceMorph = null;
         
         // Get the token from the global variable
         const clientToken = window.BANUBA_CLIENT_TOKEN;
@@ -331,16 +335,28 @@
         // Log token status (without exposing the actual token)
         console.log('Banuba client token available:', !!clientToken);
 
-        // Initialize canvas for image processing
-        function initializeCanvas() {
+        // Initialize canvas and FaceMorph
+        async function initializeCanvas() {
             canvas = document.createElement('canvas');
             ctx = canvas.getContext('2d');
+            
+            try {
+                // Initialize FaceMorph using the existing Banuba token
+                faceMorph = await FaceMorph.init({
+                    apiKey: window.BANUBA_CLIENT_TOKEN,
+                    container: canvas
+                });
+                console.log('FaceMorph initialized successfully with Banuba token');
+            } catch (error) {
+                console.error('Failed to initialize FaceMorph:', error);
+            }
+            
             console.log('Canvas initialized');
         }
 
         // Initialize on page load
-        window.addEventListener('load', () => {
-            initializeCanvas();
+        window.addEventListener('load', async () => {
+            await initializeCanvas();
             
             // Set up upload button
             document.getElementById('upload-btn').addEventListener('click', () => {
@@ -379,6 +395,16 @@
                         
                         // Store the original image data
                         originalImage = canvas.toDataURL('image/png');
+                        
+                        // Initialize face detection
+                        if (faceMorph) {
+                            try {
+                                await faceMorph.detectFaces(canvas);
+                                console.log('Face detection completed');
+                            } catch (error) {
+                                console.error('Face detection failed:', error);
+                            }
+                        }
                         
                         // Display the image in the result container
                         document.getElementById('result-image').src = originalImage;
@@ -449,6 +475,10 @@
                     throw new Error('No image available to process');
                 }
                 
+                if (!faceMorph) {
+                    throw new Error('FaceMorph not initialized');
+                }
+                
                 // Create an image element to load the image data
                 const img = new Image();
                 img.onload = async () => {
@@ -460,7 +490,7 @@
                     ctx.drawImage(img, 0, 0);
                     
                     // Apply the AI-based rhinoplasty effect
-                    applyAIRhinoplasty(ctx, effectType);
+                    await applyAIRhinoplasty(ctx, effectType);
                     
                     // Update the display with the processed image
                     const processedImage = canvas.toDataURL('image/png');
@@ -477,144 +507,145 @@
         }
 
         // AI-based rhinoplasty simulation
-        function applyAIRhinoplasty(ctx, effectType) {
-            // Get the image data
-            const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-            const data = imageData.data;
-            
-            // Apply different effects based on the type
-            switch (effectType) {
-                case 'natural':
-                    // Natural refinement - subtle rhinoplasty results
-                    FaceMorph.nose({
-                        width: 0.2,      // Slightly narrower nose
-                        length: 0.1,     // Minimal length adjustment
-                        tip_width: 0.2,  // Refined tip
-                        down_up: 0.2,    // Slight lift
-                        sellion: 0.3     // Enhanced bridge definition
-                    });
-                    FaceMorph.face({
-                        narrowing: 0.2,   // Subtle face contouring
-                        v_shape: 0.2,    // Enhanced facial harmony
-                        cheekbones_narrowing: 0.1,
-                        cheeks_narrowing: 0.1,
-                        jaw_narrowing: 0.2
-                    });
-                    break;
-                    
-                case 'bridge':
-                    // Bridge reduction - focus on dorsal hump reduction
-                    FaceMorph.nose({
-                        width: 0.3,      // Narrower bridge
-                        length: 0.2,     // Reduced length
-                        tip_width: 0.3,  // Refined tip
-                        down_up: 0.3,    // Significant lift
-                        sellion: 0.4     // Strong bridge definition
-                    });
-                    FaceMorph.face({
-                        narrowing: 0.3,
-                        v_shape: 0.3,
-                        cheekbones_narrowing: 0.2,
-                        cheeks_narrowing: 0.2,
-                        jaw_narrowing: 0.3
-                    });
-                    break;
-                    
-                case 'tip':
-                    // Tip refinement - focus on tip projection and definition
-                    FaceMorph.nose({
-                        width: 0.2,
-                        length: 0.3,     // Increased projection
-                        tip_width: 0.4,  // Significant tip refinement
-                        down_up: 0.4,    // Strong lift
-                        sellion: 0.2
-                    });
-                    FaceMorph.face({
-                        narrowing: 0.2,
-                        v_shape: 0.2,
-                        cheekbones_narrowing: 0.1,
-                        cheeks_narrowing: 0.1
-                    });
-                    break;
-                    
-                case 'narrow':
-                    // Nose narrowing - focus on overall width reduction
-                    FaceMorph.nose({
-                        width: 0.5,      // Significant width reduction
-                        length: 0.2,
-                        tip_width: 0.4,  // Narrower tip
-                        down_up: 0.2,
-                        sellion: 0.3
-                    });
-                    FaceMorph.face({
-                        narrowing: 0.4,
-                        v_shape: 0.3,
-                        cheekbones_narrowing: 0.3,
-                        cheeks_narrowing: 0.3,
-                        jaw_narrowing: 0.4
-                    });
-                    break;
-                    
-                case 'straight':
-                    // Crooked correction - focus on alignment and symmetry
-                    FaceMorph.nose({
-                        width: 0.3,
-                        length: 0.2,
-                        tip_width: 0.3,
-                        down_up: 0.3,
-                        sellion: 0.5     // Strong correction for alignment
-                    });
-                    FaceMorph.face({
-                        narrowing: 0.3,
-                        v_shape: 0.2,
-                        cheekbones_narrowing: 0.2,
-                        cheeks_narrowing: 0.2
-                    });
-                    break;
-                    
-                case 'combined':
-                    // Combined enhancement - comprehensive rhinoplasty simulation
-                    FaceMorph.face({
-                        narrowing: 0.3,
-                        v_shape: 0.3,
-                        cheekbones_narrowing: 0.2,
-                        cheeks_narrowing: 0.2,
-                        jaw_narrowing: 0.3,
-                        chin_shortening: 0.1,
-                        chin_narrowing: 0.2
-                    });
-                    FaceMorph.nose({
-                        width: 0.3,      // Balanced width reduction
-                        length: 0.2,     // Balanced length
-                        tip_width: 0.3,  // Refined tip
-                        down_up: 0.3,    // Balanced lift
-                        sellion: 0.4     // Enhanced bridge
-                    });
-                    // Subtle complementary adjustments
-                    FaceMorph.eyes({
-                        rounding: 0.2,
-                        height: 0.2,
-                        spacing: 0.2
-                    });
-                    FaceMorph.lips({
-                        size: 0.2,
-                        height: 0.2,
-                        thickness: 0.1
-                    });
-                    break;
+        async function applyAIRhinoplasty(ctx, effectType) {
+            if (!faceMorph) {
+                throw new Error('FaceMorph not initialized');
             }
             
-            // Put the modified image data back on the canvas
-            ctx.putImageData(imageData, 0, 0);
+            try {
+                // Apply different effects based on the type
+                switch (effectType) {
+                    case 'natural':
+                        await faceMorph.nose({
+                            width: 0.2,
+                            length: 0.1,
+                            tip_width: 0.2,
+                            down_up: 0.2,
+                            sellion: 0.3
+                        });
+                        await faceMorph.face({
+                            narrowing: 0.2,
+                            v_shape: 0.2,
+                            cheekbones_narrowing: 0.1,
+                            cheeks_narrowing: 0.1,
+                            jaw_narrowing: 0.2
+                        });
+                        break;
+                        
+                    case 'bridge':
+                        await faceMorph.nose({
+                            width: 0.3,
+                            length: 0.2,
+                            tip_width: 0.3,
+                            down_up: 0.3,
+                            sellion: 0.4
+                        });
+                        await faceMorph.face({
+                            narrowing: 0.3,
+                            v_shape: 0.3,
+                            cheekbones_narrowing: 0.2,
+                            cheeks_narrowing: 0.2,
+                            jaw_narrowing: 0.3
+                        });
+                        break;
+                        
+                    case 'tip':
+                        await faceMorph.nose({
+                            width: 0.2,
+                            length: 0.3,
+                            tip_width: 0.4,
+                            down_up: 0.4,
+                            sellion: 0.2
+                        });
+                        await faceMorph.face({
+                            narrowing: 0.2,
+                            v_shape: 0.2,
+                            cheekbones_narrowing: 0.1,
+                            cheeks_narrowing: 0.1
+                        });
+                        break;
+                        
+                    case 'narrow':
+                        await faceMorph.nose({
+                            width: 0.5,
+                            length: 0.2,
+                            tip_width: 0.4,
+                            down_up: 0.2,
+                            sellion: 0.3
+                        });
+                        await faceMorph.face({
+                            narrowing: 0.4,
+                            v_shape: 0.3,
+                            cheekbones_narrowing: 0.3,
+                            cheeks_narrowing: 0.3,
+                            jaw_narrowing: 0.4
+                        });
+                        break;
+                        
+                    case 'straight':
+                        await faceMorph.nose({
+                            width: 0.3,
+                            length: 0.2,
+                            tip_width: 0.3,
+                            down_up: 0.3,
+                            sellion: 0.5
+                        });
+                        await faceMorph.face({
+                            narrowing: 0.3,
+                            v_shape: 0.2,
+                            cheekbones_narrowing: 0.2,
+                            cheeks_narrowing: 0.2
+                        });
+                        break;
+                        
+                    case 'combined':
+                        await faceMorph.face({
+                            narrowing: 0.3,
+                            v_shape: 0.3,
+                            cheekbones_narrowing: 0.2,
+                            cheeks_narrowing: 0.2,
+                            jaw_narrowing: 0.3,
+                            chin_shortening: 0.1,
+                            chin_narrowing: 0.2
+                        });
+                        await faceMorph.nose({
+                            width: 0.3,
+                            length: 0.2,
+                            tip_width: 0.3,
+                            down_up: 0.3,
+                            sellion: 0.4
+                        });
+                        await faceMorph.eyes({
+                            rounding: 0.2,
+                            height: 0.2,
+                            spacing: 0.2
+                        });
+                        await faceMorph.lips({
+                            size: 0.2,
+                            height: 0.2,
+                            thickness: 0.1
+                        });
+                        break;
+                }
+                
+                // Render the modified image
+                await faceMorph.render();
+                
+            } catch (error) {
+                console.error('Error applying FaceMorph effects:', error);
+                throw error;
+            }
         }
 
         // Handle reset
-        function handleReset() {
+        async function handleReset() {
             try {
                 // Reset to original image
                 if (originalImage) {
                     // Clear all FaceMorph effects
-                    FaceMorph.clear();
+                    if (faceMorph) {
+                        await faceMorph.clear();
+                    }
                     
                     document.getElementById('result-image').src = originalImage;
                     document.getElementById('result-container').style.display = 'block';

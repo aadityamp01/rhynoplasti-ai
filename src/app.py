@@ -603,7 +603,7 @@ def main():
             return
         
         # Display the AR simulation
-        st.components.v1.html(get_ar_html(), height=600)
+        st.components.v1.html(get_ar_html(), height=900)
         
 
 if __name__ == "__main__":
