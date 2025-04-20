@@ -7,6 +7,10 @@ import cv2
 import mediapipe as mp
 from scipy.interpolate import griddata
 import random
+import base64
+import json
+import requests
+from pathlib import Path
 
 # Set page config
 st.set_page_config(
@@ -64,6 +68,11 @@ st.markdown("""
         border-radius: 10px;
         box-shadow: 0 2px 4px rgba(0,0,0,0.1);
     }
+    iframe {
+        border: none;
+        border-radius: 10px;
+        box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+    }
     </style>
 """, unsafe_allow_html=True)
 
@@ -100,6 +109,32 @@ RHINOPLASTY_OPTIONS = {
         "intensity": 0.6
     }
 }
+
+# Define available AI models
+AI_MODELS = {
+    "banuba": {
+        "name": "Banuba AR",
+        "description": "Advanced AR technology for realistic rhinoplasty simulation",
+        "icon": "🤖"
+    },
+    "local": {
+        "name": "Local Processing",
+        "description": "Process images locally using computer vision techniques",
+        "icon": "💻"
+    }
+}
+
+def get_banuba_html():
+    """Get the HTML content for the Banuba integration"""
+    html_path = Path(__file__).parent / "banuba_integration.html"
+    with open(html_path, "r", encoding="utf-8") as f:
+        html_content = f.read()
+    
+    # Get the Banuba client token from Streamlit secrets
+    banuba_token = st.secrets.get("BANUBA_CLIENT_TOKEN", "YOUR_BANUBA_CLIENT_TOKEN")
+    html_content = html_content.replace("YOUR_BANUBA_CLIENT_TOKEN", banuba_token)
+    
+    return html_content
 
 def detect_nose_landmarks(image):
     try:
@@ -576,105 +611,121 @@ def main():
         </div>
     """, unsafe_allow_html=True)
 
-    # Create two columns for layout
-    col1, col2 = st.columns([1, 1])
-
-    with col1:
+    # Create tabs for different simulation methods
+    tab1, tab2 = st.tabs(["Banuba AR Simulation", "Local Processing"])
+    
+    with tab1:
         st.markdown("""
             <div class='upload-section'>
-                <h2 style='color: #2c3e50;'>Upload Your Photo</h2>
-                <p style='color: #7f8c8d;'>Choose a clear, front-facing photo for best results</p>
+                <h2 style='color: #2c3e50;'>Banuba AR Rhinoplasty Simulation</h2>
+                <p style='color: #7f8c8d;'>Use your camera for real-time rhinoplasty simulation</p>
             </div>
         """, unsafe_allow_html=True)
         
-        # File uploader with custom styling
-        uploaded_file = st.file_uploader("", type=["jpg", "jpeg", "png"], key="photo_upload")
+        # Display the Banuba integration
+        banuba_html = get_banuba_html()
+        st.components.v1.html(banuba_html, height=800, scrolling=True)
+    
+    with tab2:
+        # Create two columns for layout
+        col1, col2 = st.columns([1, 1])
 
-    with col2:
-        st.markdown("""
-            <div class='upload-section'>
-                <h2 style='color: #2c3e50;'>Choose Your Option</h2>
-                <p style='color: #7f8c8d;'>Select the type of rhinoplasty you're interested in</p>
-            </div>
-        """, unsafe_allow_html=True)
-        
-        # Rhinoplasty options with custom styling
-        option = st.selectbox(
-            "",
-            list(RHINOPLASTY_OPTIONS.keys()),
-            format_func=lambda x: f"{RHINOPLASTY_OPTIONS[x]['icon']} {x}"
-        )
-        
-        # Display option description
-        st.markdown(f"""
-            <div class='option-card'>
-                <p style='color: #2c3e50;'>{RHINOPLASTY_OPTIONS[option]['description']}</p>
-            </div>
-        """, unsafe_allow_html=True)
-        
-        # Add intensity slider
-        intensity = st.slider(
-            "Adjust the intensity of the effect",
-            min_value=0.0,
-            max_value=1.0,
-            value=RHINOPLASTY_OPTIONS[option]["intensity"],
-            step=0.1,
-            format="%.1f"
-        )
+        with col1:
+            st.markdown("""
+                <div class='upload-section'>
+                    <h2 style='color: #2c3e50;'>Upload Your Photo</h2>
+                    <p style='color: #7f8c8d;'>Choose a clear, front-facing photo for best results</p>
+                </div>
+            """, unsafe_allow_html=True)
+            
+            # File uploader with custom styling
+            uploaded_file = st.file_uploader("", type=["jpg", "jpeg", "png"], key="photo_upload")
 
-    if uploaded_file is not None:
-        try:
-            # Convert uploaded file to image
-            file_bytes = np.asarray(bytearray(uploaded_file.read()), dtype=np.uint8)
-            image = cv2.imdecode(file_bytes, 1)
+        with col2:
+            st.markdown("""
+                <div class='upload-section'>
+                    <h2 style='color: #2c3e50;'>Choose Your Options</h2>
+                    <p style='color: #7f8c8d;'>Select the rhinoplasty type</p>
+                </div>
+            """, unsafe_allow_html=True)
             
-            # Create columns for before/after comparison
-            before_col, after_col = st.columns(2)
+            # Rhinoplasty options with custom styling
+            option = st.selectbox(
+                "Select Rhinoplasty Type",
+                list(RHINOPLASTY_OPTIONS.keys()),
+                format_func=lambda x: f"{RHINOPLASTY_OPTIONS[x]['icon']} {x}"
+            )
             
-            with before_col:
-                st.markdown("""
-                    <h3 style='color: #2c3e50; text-align: center;'>Before</h3>
-                """, unsafe_allow_html=True)
-                st.image(image, channels="BGR", use_container_width=True)
+            # Display option description
+            st.markdown(f"""
+                <div class='option-card'>
+                    <p style='color: #2c3e50;'>{RHINOPLASTY_OPTIONS[option]['description']}</p>
+                </div>
+            """, unsafe_allow_html=True)
             
-            # Detect nose landmarks and create mask
-            mask, nose_region, nose_landmarks = detect_nose_landmarks(image)
-            
-            if mask is not None:
-                if st.button("Generate Rhinoplasty Result", key="generate_btn"):
-                    with st.spinner("Processing your image..."):
-                        # Simulate the rhinoplasty
-                        result_image = simulate_rhinoplasty(image, mask, nose_landmarks, option)
-                        
-                        with after_col:
+            # Add intensity slider
+            intensity = st.slider(
+                "Adjust the intensity of the effect",
+                min_value=0.0,
+                max_value=1.0,
+                value=RHINOPLASTY_OPTIONS[option]["intensity"],
+                step=0.1,
+                format="%.1f"
+            )
+        
+        if uploaded_file is not None:
+            try:
+                # Convert uploaded file to image
+                file_bytes = np.asarray(bytearray(uploaded_file.read()), dtype=np.uint8)
+                image = cv2.imdecode(file_bytes, 1)
+                
+                # Create columns for before/after comparison
+                before_col, after_col = st.columns(2)
+                
+                with before_col:
+                    st.markdown("""
+                        <h3 style='color: #2c3e50; text-align: center;'>Before</h3>
+                    """, unsafe_allow_html=True)
+                    st.image(image, channels="BGR", use_container_width=True)
+                
+                # Detect nose landmarks and create mask
+                mask, nose_region, nose_landmarks = detect_nose_landmarks(image)
+                
+                if mask is not None:
+                    if st.button("Generate Rhinoplasty Result", key="generate_btn"):
+                        with st.spinner("Processing your image..."):
+                            # Simulate the rhinoplasty
+                            result_image = simulate_rhinoplasty(image, mask, nose_landmarks, option)
+                            
+                            with after_col:
+                                st.markdown("""
+                                    <h3 style='color: #2c3e50; text-align: center;'>After</h3>
+                                """, unsafe_allow_html=True)
+                                st.image(result_image, channels="BGR", use_container_width=True)
+                            
+                            # Add download button with custom styling
+                            result_rgb = cv2.cvtColor(result_image, cv2.COLOR_BGR2RGB)
+                            result_pil = Image.fromarray(result_rgb)
+                            buf = io.BytesIO()
+                            result_pil.save(buf, format="PNG")
+                            byte_im = buf.getvalue()
+                            
                             st.markdown("""
-                                <h3 style='color: #2c3e50; text-align: center;'>After</h3>
+                                <div style='text-align: center; margin-top: 2rem;'>
                             """, unsafe_allow_html=True)
-                            st.image(result_image, channels="BGR", use_container_width=True)
-                        
-                        # Add download button with custom styling
-                        result_rgb = cv2.cvtColor(result_image, cv2.COLOR_BGR2RGB)
-                        result_pil = Image.fromarray(result_rgb)
-                        buf = io.BytesIO()
-                        result_pil.save(buf, format="PNG")
-                        byte_im = buf.getvalue()
-                        
-                        st.markdown("""
-                            <div style='text-align: center; margin-top: 2rem;'>
-                        """, unsafe_allow_html=True)
-                        
-                        st.download_button(
-                            label="📥 Download Result",
-                            data=byte_im,
-                            file_name=f"rhinoplasty_result_{option.lower().replace(' ', '_')}.png",
-                            mime="image/png"
-                        )
-                        
-                        st.markdown("</div>", unsafe_allow_html=True)
-            else:
-                st.error("No face detected in the image. Please try another photo.")
-        except Exception as e:
-            st.error(f"Error processing image: {str(e)}")
+                            
+                            st.download_button(
+                                label="📥 Download Result",
+                                data=byte_im,
+                                file_name=f"rhinoplasty_result_{option.lower().replace(' ', '_')}.png",
+                                mime="image/png"
+                            )
+                            
+                            st.markdown("</div>", unsafe_allow_html=True)
+                else:
+                    st.error("No face detected in the image. Please try another photo.")
+            except Exception as e:
+                st.error(f"Error processing image: {str(e)}")
     
     # Footer
     st.markdown("""
