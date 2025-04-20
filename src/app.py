@@ -6,14 +6,91 @@ import os
 import cv2
 import mediapipe as mp
 
-# Define rhinoplasty options
+# Set page config
+st.set_page_config(
+    page_title="AI Rhinoplasty Simulator",
+    page_icon="👃",
+    layout="wide",
+    initial_sidebar_state="expanded"
+)
+
+# Custom CSS
+st.markdown("""
+    <style>
+    .main {
+        padding: 2rem;
+    }
+    .stButton>button {
+        width: 100%;
+        height: 3em;
+        background-color: #4CAF50;
+        color: white;
+        border-radius: 5px;
+        border: none;
+        font-size: 16px;
+        font-weight: bold;
+    }
+    .stButton>button:hover {
+        background-color: #45a049;
+    }
+    .upload-section {
+        background-color: #f8f9fa;
+        padding: 2rem;
+        border-radius: 10px;
+        margin-bottom: 2rem;
+    }
+    .result-section {
+        background-color: #ffffff;
+        padding: 2rem;
+        border-radius: 10px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    .option-card {
+        background-color: #f8f9fa;
+        padding: 1rem;
+        border-radius: 5px;
+        margin-bottom: 1rem;
+        border: 1px solid #dee2e6;
+    }
+    .option-card:hover {
+        border-color: #4CAF50;
+    }
+    .stSelectbox {
+        margin-bottom: 1rem;
+    }
+    .stImage {
+        border-radius: 10px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    </style>
+""", unsafe_allow_html=True)
+
+# Define rhinoplasty options with icons
 RHINOPLASTY_OPTIONS = {
-    "Natural Refinement": "Subtle changes to create a more balanced nose while maintaining natural appearance",
-    "Nose Bridge Reduction": "Reduce the height of the nose bridge for a more streamlined profile",
-    "Tip Refinement": "Refine the nose tip to be more defined and elegant",
-    "Wide Nose Narrowing": "Narrow a wide nose for better facial harmony",
-    "Crooked Nose Correction": "Straighten a crooked nose for better symmetry",
-    "Combined Enhancement": "Comprehensive nose reshaping with multiple refinements"
+    "Natural Refinement": {
+        "description": "Subtle changes to create a more balanced nose while maintaining natural appearance",
+        "icon": "✨"
+    },
+    "Nose Bridge Reduction": {
+        "description": "Reduce the height of the nose bridge for a more streamlined profile",
+        "icon": "📉"
+    },
+    "Tip Refinement": {
+        "description": "Refine the nose tip to be more defined and elegant",
+        "icon": "🎯"
+    },
+    "Wide Nose Narrowing": {
+        "description": "Narrow a wide nose for better facial harmony",
+        "icon": "↔️"
+    },
+    "Crooked Nose Correction": {
+        "description": "Straighten a crooked nose for better symmetry",
+        "icon": "📏"
+    },
+    "Combined Enhancement": {
+        "description": "Comprehensive nose reshaping with multiple refinements",
+        "icon": "🌟"
+    }
 }
 
 def detect_nose_landmarks(image):
@@ -278,60 +355,115 @@ def apply_combined_enhancement(image, mask, nose_bridge_points, nose_tip_points)
     return result
 
 def main():
-    st.title("AI Rhinoplasty Simulator")
-    st.write("Upload a photo to see how you might look after rhinoplasty")
-    
-    # File uploader
-    uploaded_file = st.file_uploader("Choose an image...", type=["jpg", "jpeg", "png"])
-    
+    # Header
+    st.markdown("""
+        <div style='text-align: center; padding: 2rem;'>
+            <h1 style='color: #2c3e50;'>AI Rhinoplasty Simulator</h1>
+            <p style='color: #7f8c8d; font-size: 1.2em;'>
+                Experience how you might look after rhinoplasty using advanced AI technology
+            </p>
+        </div>
+    """, unsafe_allow_html=True)
+
+    # Create two columns for layout
+    col1, col2 = st.columns([1, 1])
+
+    with col1:
+        st.markdown("""
+            <div class='upload-section'>
+                <h2 style='color: #2c3e50;'>Upload Your Photo</h2>
+                <p style='color: #7f8c8d;'>Choose a clear, front-facing photo for best results</p>
+            </div>
+        """, unsafe_allow_html=True)
+        
+        # File uploader with custom styling
+        uploaded_file = st.file_uploader("", type=["jpg", "jpeg", "png"], key="photo_upload")
+
+    with col2:
+        st.markdown("""
+            <div class='upload-section'>
+                <h2 style='color: #2c3e50;'>Choose Your Option</h2>
+                <p style='color: #7f8c8d;'>Select the type of rhinoplasty you're interested in</p>
+            </div>
+        """, unsafe_allow_html=True)
+        
+        # Rhinoplasty options with custom styling
+        option = st.selectbox(
+            "",
+            list(RHINOPLASTY_OPTIONS.keys()),
+            format_func=lambda x: f"{RHINOPLASTY_OPTIONS[x]['icon']} {x}"
+        )
+        
+        # Display option description
+        st.markdown(f"""
+            <div class='option-card'>
+                <p style='color: #2c3e50;'>{RHINOPLASTY_OPTIONS[option]['description']}</p>
+            </div>
+        """, unsafe_allow_html=True)
+
     if uploaded_file is not None:
         try:
             # Convert uploaded file to image
             file_bytes = np.asarray(bytearray(uploaded_file.read()), dtype=np.uint8)
             image = cv2.imdecode(file_bytes, 1)
             
-            # Display original image
-            st.image(image, channels="BGR", caption="Original Image")
+            # Create columns for before/after comparison
+            before_col, after_col = st.columns(2)
+            
+            with before_col:
+                st.markdown("""
+                    <h3 style='color: #2c3e50; text-align: center;'>Before</h3>
+                """, unsafe_allow_html=True)
+                st.image(image, channels="BGR", use_column_width=True)
             
             # Detect nose landmarks and create mask
             mask, nose_region, nose_landmarks = detect_nose_landmarks(image)
             
             if mask is not None:
-                # Display mask
-                st.image(mask, caption="Nose Region Mask")
-                
-                # Rhinoplasty options
-                st.subheader("Choose Rhinoplasty Option")
-                option = st.selectbox(
-                    "Select the type of rhinoplasty you're interested in:",
-                    list(RHINOPLASTY_OPTIONS.keys()),
-                    format_func=lambda x: f"{x} - {RHINOPLASTY_OPTIONS[x]}"
-                )
-                
-                if st.button("Generate Rhinoplasty Result"):
-                    # Simulate the rhinoplasty
-                    result_image = simulate_rhinoplasty(image, mask, nose_landmarks, option)
-                    
-                    # Display result
-                    st.image(result_image, channels="BGR", caption=f"After {option}")
-                    
-                    # Add a download button
-                    result_rgb = cv2.cvtColor(result_image, cv2.COLOR_BGR2RGB)
-                    result_pil = Image.fromarray(result_rgb)
-                    buf = io.BytesIO()
-                    result_pil.save(buf, format="PNG")
-                    byte_im = buf.getvalue()
-                    
-                    st.download_button(
-                        label="Download Result",
-                        data=byte_im,
-                        file_name=f"rhinoplasty_result_{option.lower().replace(' ', '_')}.png",
-                        mime="image/png"
-                    )
+                if st.button("Generate Rhinoplasty Result", key="generate_btn"):
+                    with st.spinner("Processing your image..."):
+                        # Simulate the rhinoplasty
+                        result_image = simulate_rhinoplasty(image, mask, nose_landmarks, option)
+                        
+                        with after_col:
+                            st.markdown("""
+                                <h3 style='color: #2c3e50; text-align: center;'>After</h3>
+                            """, unsafe_allow_html=True)
+                            st.image(result_image, channels="BGR", use_column_width=True)
+                        
+                        # Add download button with custom styling
+                        result_rgb = cv2.cvtColor(result_image, cv2.COLOR_BGR2RGB)
+                        result_pil = Image.fromarray(result_rgb)
+                        buf = io.BytesIO()
+                        result_pil.save(buf, format="PNG")
+                        byte_im = buf.getvalue()
+                        
+                        st.markdown("""
+                            <div style='text-align: center; margin-top: 2rem;'>
+                        """, unsafe_allow_html=True)
+                        
+                        st.download_button(
+                            label="📥 Download Result",
+                            data=byte_im,
+                            file_name=f"rhinoplasty_result_{option.lower().replace(' ', '_')}.png",
+                            mime="image/png"
+                        )
+                        
+                        st.markdown("</div>", unsafe_allow_html=True)
             else:
                 st.error("No face detected in the image. Please try another photo.")
         except Exception as e:
             st.error(f"Error processing image: {str(e)}")
+    
+    # Footer
+    st.markdown("""
+        <div style='text-align: center; padding: 2rem; margin-top: 2rem;'>
+            <p style='color: #7f8c8d;'>
+                This is a simulation tool and should not be used as a substitute for professional medical advice.
+                Please consult with a qualified healthcare provider for medical procedures.
+            </p>
+        </div>
+    """, unsafe_allow_html=True)
 
 if __name__ == "__main__":
     main() 
