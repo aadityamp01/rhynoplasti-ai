@@ -3,46 +3,10 @@ import numpy as np
 from PIL import Image
 import io
 import os
-import tempfile
-import time
-
-try:
-    import cv2
-    import mediapipe as mp
-    from diffusers import StableDiffusionInpaintPipeline
-    import torch
-    OPENCV_AVAILABLE = True
-    STABLE_DIFFUSION_AVAILABLE = True
-except ImportError as e:
-    st.error(f"Error importing required libraries: {str(e)}")
-    OPENCV_AVAILABLE = False
-    STABLE_DIFFUSION_AVAILABLE = False
-
-# Global variable to store the model
-@st.cache_resource
-def load_model():
-    try:
-        # Load the Stable Diffusion model
-        pipe = StableDiffusionInpaintPipeline.from_pretrained(
-            "runwayml/stable-diffusion-inpainting",
-            torch_dtype=torch.float16 if torch.cuda.is_available() else torch.float32,
-            safety_checker=None  # Disable safety checker for better performance
-        )
-        
-        # Move to GPU if available
-        if torch.cuda.is_available():
-            pipe = pipe.to("cuda")
-        
-        return pipe
-    except Exception as e:
-        st.error(f"Error loading Stable Diffusion model: {str(e)}")
-        return None
+import cv2
+import mediapipe as mp
 
 def detect_nose_landmarks(image):
-    if not OPENCV_AVAILABLE:
-        st.error("OpenCV is not available. Please check the installation.")
-        return None
-        
     try:
         # Convert the image to RGB
         image_rgb = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
@@ -58,7 +22,7 @@ def detect_nose_landmarks(image):
             results = face_mesh.process(image_rgb)
             
             if not results.multi_face_landmarks:
-                return None
+                return None, None
             
             # Get nose landmarks (indices 1-10 are typically nose-related)
             nose_landmarks = results.multi_face_landmarks[0].landmark[1:11]
@@ -73,53 +37,54 @@ def detect_nose_landmarks(image):
             # Draw the nose region on the mask
             cv2.fillConvexPoly(mask, nose_points, 255)
             
-            return mask
+            # Get the nose region
+            nose_region = cv2.bitwise_and(image, image, mask=mask)
+            
+            return mask, nose_region
     except Exception as e:
         st.error(f"Error in nose landmark detection: {str(e)}")
-        return None
+        return None, None
 
-def generate_rhinoplasty_image(image, mask):
+def simulate_rhinoplasty(image, mask, nose_region):
     try:
-        if not STABLE_DIFFUSION_AVAILABLE:
-            st.error("Stable Diffusion is not available. Please check the installation.")
-            return None
-            
-        # Get the model from cache
-        pipe = load_model()
-        if pipe is None:
-            return None
-            
-        # Convert image to PIL format
-        image_pil = Image.fromarray(cv2.cvtColor(image, cv2.COLOR_BGR2RGB))
-        mask_pil = Image.fromarray(mask)
+        # Create a copy of the image
+        result = image.copy()
         
-        # Create the prompt
-        prompt = "a natural-looking nose after rhinoplasty, subtle refinement, realistic, high quality, detailed"
-        negative_prompt = "deformed, ugly, unrealistic, cartoon, anime, illustration, painting, drawing"
+        # Apply a slight blur to the nose region to simulate smoothing
+        blurred_nose = cv2.GaussianBlur(nose_region, (5, 5), 0)
         
-        # Generate the image
-        with st.spinner("Generating rhinoplasty result..."):
-            result = pipe(
-                prompt=prompt,
-                negative_prompt=negative_prompt,
-                image=image_pil,
-                mask_image=mask_pil,
-                num_inference_steps=20,  # Reduced for faster generation
-                guidance_scale=7.5
-            ).images[0]
+        # Apply a slight brightness increase to the nose region
+        hsv = cv2.cvtColor(blurred_nose, cv2.COLOR_BGR2HSV)
+        hsv[:, :, 2] = hsv[:, :, 2] * 1.1  # Increase brightness by 10%
+        brightened_nose = cv2.cvtColor(hsv, cv2.COLOR_HSV2BGR)
+        
+        # Apply the modified nose region back to the image
+        result = cv2.bitwise_and(result, result, mask=cv2.bitwise_not(mask))
+        result = cv2.add(result, brightened_nose)
+        
+        # Apply a slight contour adjustment to simulate a more defined nose
+        kernel = np.ones((3, 3), np.uint8)
+        dilated_mask = cv2.dilate(mask, kernel, iterations=1)
+        contour_mask = cv2.bitwise_xor(dilated_mask, mask)
+        
+        # Apply a slight darkening to the contour to create definition
+        contour_region = cv2.bitwise_and(result, result, mask=contour_mask)
+        hsv_contour = cv2.cvtColor(contour_region, cv2.COLOR_BGR2HSV)
+        hsv_contour[:, :, 2] = hsv_contour[:, :, 2] * 0.9  # Decrease brightness by 10%
+        darkened_contour = cv2.cvtColor(hsv_contour, cv2.COLOR_HSV2BGR)
+        
+        # Apply the contour adjustment
+        result = cv2.bitwise_and(result, result, mask=cv2.bitwise_not(contour_mask))
+        result = cv2.add(result, darkened_contour)
         
         return result
     except Exception as e:
-        st.error(f"Error in image generation: {str(e)}")
-        return None
+        st.error(f"Error in rhinoplasty simulation: {str(e)}")
+        return image
 
 def main():
     st.title("AI Rhinoplasty Simulator")
     st.write("Upload a photo to see how you might look after rhinoplasty")
-    
-    if not OPENCV_AVAILABLE:
-        st.error("OpenCV is not available. Please check the installation.")
-        return
     
     # File uploader
     uploaded_file = st.file_uploader("Choose an image...", type=["jpg", "jpeg", "png"])
@@ -134,19 +99,18 @@ def main():
             st.image(image, channels="BGR", caption="Original Image")
             
             # Detect nose landmarks and create mask
-            mask = detect_nose_landmarks(image)
+            mask, nose_region = detect_nose_landmarks(image)
             
             if mask is not None:
                 # Display mask
                 st.image(mask, caption="Nose Region Mask")
                 
                 if st.button("Generate Rhinoplasty Result"):
-                    # Generate the rhinoplasty image
-                    result_image = generate_rhinoplasty_image(image, mask)
+                    # Simulate the rhinoplasty
+                    result_image = simulate_rhinoplasty(image, mask, nose_region)
                     
-                    if result_image:
-                        # Display result
-                        st.image(result_image, caption="After Rhinoplasty")
+                    # Display result
+                    st.image(result_image, channels="BGR", caption="After Rhinoplasty")
             else:
                 st.error("No face detected in the image. Please try another photo.")
         except Exception as e:
