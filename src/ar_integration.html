@@ -51,10 +51,6 @@
             visibility: visible !important;
             opacity: 1 !important;
         }
-        .mode-switch {
-            margin-bottom: 20px;
-            text-align: center;
-        }
         #permission-message {
             display: none;
             color: red;
@@ -134,23 +130,49 @@
             text-align: center;
             box-shadow: 0 2px 4px rgba(0,0,0,0.1);
         }
+        .upload-container {
+            text-align: center;
+            margin: 20px 0;
+            padding: 20px;
+            border: 2px dashed #007bff;
+            border-radius: 8px;
+            background-color: #f8f9fa;
+        }
+        .upload-btn {
+            display: inline-block;
+            padding: 12px 24px;
+            background-color: #007bff;
+            color: white;
+            border-radius: 5px;
+            cursor: pointer;
+            font-weight: bold;
+            margin-bottom: 10px;
+        }
+        .upload-btn:hover {
+            background-color: #0056b3;
+        }
+        .upload-text {
+            color: #6c757d;
+            margin-top: 10px;
+        }
     </style>
 </head>
 <body>
     <div class="container">
         <div class="header">
-            <h1>AR Rhinoplasty Simulator</h1>
+            <h1>Rhinoplasty AI Simulator</h1>
             <p>Experience how you might look after rhinoplasty using advanced AI technology</p>
         </div>
         
-        <div class="mode-switch">
-            <button id="camera-mode" class="active">Camera Mode</button>
-            <button id="upload-mode">Upload Image</button>
-            <input type="file" id="image-upload" accept="image/*" style="display: none;">
+        <div id="permission-message">
+            Error loading image. Please try again.
         </div>
         
-        <div id="permission-message">
-            Camera permission is required for AR simulation. Please allow camera access.
+        <!-- Upload container -->
+        <div class="upload-container">
+            <div class="upload-btn" id="upload-btn">Upload Image</div>
+            <input type="file" id="image-upload" accept="image/*" style="display: none;">
+            <div class="upload-text">Click to upload a photo of your face</div>
         </div>
         
         <!-- Ready message - will be shown after image upload -->
@@ -171,8 +193,12 @@
             </ul>
         </div>
         
-        <!-- Banuba WebAR container -->
-        <div id="webar-app"></div>
+        <!-- Image display container -->
+        <div class="result-container" id="result-container" style="display: none;">
+            <h2>Your Rhinoplasty Result</h2>
+            <img id="result-image" class="result-image" src="" alt="Rhinoplasty Result">
+            <a id="download-btn" class="download-btn" download="rhinoplasty-result.png">Download Result</a>
+        </div>
         
         <div class="effect-buttons">
             <button id="natural-refinement">Natural Refinement</button>
@@ -184,14 +210,7 @@
         </div>
         
         <div class="controls">
-            <button id="capture">Capture Image</button>
-            <button id="reset">Reset</button>
-        </div>
-        
-        <div class="result-container" id="result-container" style="display: none;">
-            <h2>Your Rhinoplasty Result</h2>
-            <img id="result-image" class="result-image" src="" alt="Rhinoplasty Result">
-            <a id="download-btn" class="download-btn" download="rhinoplasty-result.png">Download Result</a>
+            <button id="reset">Reset to Original</button>
         </div>
     </div>
 
@@ -200,14 +219,13 @@
     
     <!-- AR Integration -->
     <script type="module">
-        import { Webcam, Player, Module, Effect, Dom, ImageCapture } from "https://cdn.jsdelivr.net/npm/@banuba/webar/dist/BanubaSDK.browser.esm.js";
+        import { Player, Module, Effect, Dom, ImageCapture } from "https://cdn.jsdelivr.net/npm/@banuba/webar/dist/BanubaSDK.browser.esm.js";
 
         let player = null;
         let capture = null;
         let currentEffect = null;
         let originalImage = null;
         let isProcessing = false;
-        let isCameraMode = true;
         let canvas = null;
         let ctx = null;
         
@@ -217,87 +235,34 @@
         // Log token status (without exposing the actual token)
         console.log('Banuba client token available:', !!clientToken);
 
-        // Initialize Banuba WebAR
-        async function initializeBanubaWebAR() {
-            try {
-                if (!clientToken) {
-                    console.error('Banuba client token is missing or invalid');
-                    document.getElementById('permission-message').textContent = 'Banuba client token is missing. Please check your Streamlit secrets configuration.';
-                    document.getElementById('permission-message').style.display = 'block';
-                    return false;
-                }
-                
-                // Create player
-                player = await Player.create({ clientToken: clientToken });
-                
-                // Add face tracking module
-                await player.addModule(new Module("https://cdn.jsdelivr.net/npm/@banuba/webar/dist/modules/face_tracker.zip"));
-                
-                // Use webcam
-                await player.use(new Webcam());
-                
-                // Initialize image capture
-                capture = new ImageCapture(player);
-                
-                // Render to DOM
-                Dom.render(player, "#webar-app");
-                
-                // Create canvas for image processing
-                canvas = document.createElement('canvas');
-                ctx = canvas.getContext('2d');
-                
-                // Show the controls
-                document.querySelector('.effect-buttons').style.display = 'flex';
-                document.querySelector('.controls').style.display = 'flex';
-                
-                console.log('Banuba WebAR initialized successfully');
-                return true;
-            } catch (error) {
-                console.error('Failed to initialize Banuba WebAR:', error);
-                document.getElementById('permission-message').textContent = `Error initializing AR: ${error.message}`;
-                document.getElementById('permission-message').style.display = 'block';
-                return false;
-            }
+        // Initialize canvas for image processing
+        function initializeCanvas() {
+            canvas = document.createElement('canvas');
+            ctx = canvas.getContext('2d');
+            console.log('Canvas initialized');
         }
 
-        // Mode switching
-        document.getElementById('camera-mode').addEventListener('click', async () => {
-            isCameraMode = true;
-            document.getElementById('image-upload').style.display = 'none';
-            document.getElementById('camera-mode').classList.add('active');
-            document.getElementById('upload-mode').classList.remove('active');
+        // Initialize on page load
+        window.addEventListener('load', () => {
+            initializeCanvas();
             
-            // Reinitialize WebAR for camera mode
-            if (player) {
-                await player.dispose();
-                player = null;
-            }
+            // Set up upload button
+            document.getElementById('upload-btn').addEventListener('click', () => {
+                document.getElementById('image-upload').click();
+            });
             
-            await initializeBanubaWebAR();
+            // Set up image upload handling
+            document.getElementById('image-upload').addEventListener('change', handleImageUpload);
+            
+            // Set up effect buttons
+            setupEffectButtons();
+            
+            // Set up reset button
+            document.getElementById('reset').addEventListener('click', handleReset);
         });
 
-        document.getElementById('upload-mode').addEventListener('click', () => {
-            isCameraMode = false;
-            document.getElementById('image-upload').style.display = 'block';
-            document.getElementById('upload-mode').classList.add('active');
-            document.getElementById('camera-mode').classList.remove('active');
-            
-            // Dispose of WebAR player
-            if (player) {
-                player.dispose();
-                player = null;
-            }
-            
-            // Hide the controls until an image is loaded
-            document.querySelector('.effect-buttons').style.display = 'none';
-            document.querySelector('.controls').style.display = 'none';
-            
-            // Trigger file input click
-            document.getElementById('image-upload').click();
-        });
-
-        // Image upload handling
-        document.getElementById('image-upload').addEventListener('change', async (event) => {
+        // Handle image upload
+        async function handleImageUpload(event) {
             const file = event.target.files[0];
             if (file) {
                 try {
@@ -324,31 +289,13 @@
                         document.getElementById('result-container').style.display = 'block';
                         document.getElementById('download-btn').href = originalImage;
                         
-                        // Show the controls - make sure they're visible
-                        const effectButtons = document.querySelector('.effect-buttons');
-                        const controls = document.querySelector('.controls');
+                        // Show the ready message and instructions
+                        document.getElementById('ready-message').style.display = 'block';
+                        document.getElementById('effect-instructions').style.display = 'block';
                         
-                        effectButtons.style.display = 'flex';
-                        controls.style.display = 'flex';
-                        
-                        // Force the buttons to be visible with inline styles
-                        effectButtons.style.visibility = 'visible';
-                        effectButtons.style.opacity = '1';
-                        controls.style.visibility = 'visible';
-                        controls.style.opacity = '1';
-                        
-                        console.log('Controls displayed:', 
-                            'Effect buttons visible:', effectButtons.style.display, 
-                            'Controls visible:', controls.style.display);
-                        
-                        // Add a visual indicator that the image is ready for effects
-                        const header = document.querySelector('.header');
-                        const readyMessage = document.createElement('div');
-                        readyMessage.style.color = 'green';
-                        readyMessage.style.marginTop = '10px';
-                        readyMessage.style.fontWeight = 'bold';
-                        readyMessage.textContent = 'Image loaded! Click on any effect button to apply rhinoplasty effects.';
-                        header.appendChild(readyMessage);
+                        // Show the effect buttons and controls
+                        document.querySelector('.effect-buttons').style.display = 'flex';
+                        document.querySelector('.controls').style.display = 'flex';
                         
                         console.log('Image loaded successfully and ready for effects');
                     };
@@ -356,58 +303,53 @@
                     img.src = imageUrl;
                 } catch (error) {
                     console.error('Error loading image:', error);
-                    alert('Error loading image: ' + error.message);
+                    document.getElementById('permission-message').textContent = 'Error loading image: ' + error.message;
+                    document.getElementById('permission-message').style.display = 'block';
                 }
             }
-        });
+        }
 
-        // Effect buttons
-        const effects = {
-            'natural-refinement': 'natural',
-            'bridge-reduction': 'bridge',
-            'tip-refinement': 'tip',
-            'nose-narrowing': 'narrow',
-            'crooked-correction': 'straight',
-            'combined-enhancement': 'combined'
-        };
+        // Set up effect buttons
+        function setupEffectButtons() {
+            const effects = {
+                'natural-refinement': 'natural',
+                'bridge-reduction': 'bridge',
+                'tip-refinement': 'tip',
+                'nose-narrowing': 'narrow',
+                'crooked-correction': 'straight',
+                'combined-enhancement': 'combined'
+            };
 
-        Object.keys(effects).forEach(effectId => {
-            const button = document.getElementById(effectId);
-            if (button) {
-                button.addEventListener('click', async () => {
-                    console.log('Effect button clicked:', effectId);
-                    if (!isProcessing) {
-                        try {
-                            isProcessing = true;
-                            // Apply the effect using our custom processing
-                            const effectType = effects[effectId];
-                            await applyCustomEffect(effectType);
-                            console.log(`Applied effect: ${effectType}`);
-                            isProcessing = false;
-                        } catch (error) {
-                            console.error(`Failed to apply effect ${effectType}:`, error);
-                            isProcessing = false;
-                            alert('Failed to apply effect: ' + error.message);
+            Object.keys(effects).forEach(effectId => {
+                const button = document.getElementById(effectId);
+                if (button) {
+                    button.addEventListener('click', async () => {
+                        console.log('Effect button clicked:', effectId);
+                        if (!isProcessing) {
+                            try {
+                                isProcessing = true;
+                                // Apply the effect using our custom processing
+                                const effectType = effects[effectId];
+                                await applyCustomEffect(effectType);
+                                console.log(`Applied effect: ${effectType}`);
+                                isProcessing = false;
+                            } catch (error) {
+                                console.error(`Failed to apply effect ${effectType}:`, error);
+                                isProcessing = false;
+                                alert('Failed to apply effect: ' + error.message);
+                            }
                         }
-                    }
-                });
-            } else {
-                console.error('Effect button not found:', effectId);
-            }
-        });
+                    });
+                } else {
+                    console.error('Effect button not found:', effectId);
+                }
+            });
+        }
 
         // Custom effect application
         async function applyCustomEffect(effectType) {
             try {
-                let imageData;
-                
-                if (isCameraMode && player && capture) {
-                    // Get the current frame from camera
-                    imageData = await capture.takePhoto();
-                } else if (originalImage) {
-                    // Use the original image
-                    imageData = originalImage;
-                } else {
+                if (!originalImage) {
                     throw new Error('No image available to process');
                 }
                 
@@ -421,50 +363,8 @@
                     // Draw the image on the canvas
                     ctx.drawImage(img, 0, 0);
                     
-                    // Get face landmarks if in camera mode
-                    let landmarks = null;
-                    if (isCameraMode && player) {
-                        try {
-                            landmarks = await player.getFaceLandmarks();
-                        } catch (error) {
-                            console.error('Error getting face landmarks:', error);
-                        }
-                    }
-                    
-                    if (landmarks) {
-                        // Get nose points
-                        const nosePoints = getNosePoints(landmarks);
-                        
-                        if (nosePoints.length > 0) {
-                            // Apply our custom effect based on the type
-                            switch (effectType) {
-                                case 'natural':
-                                    applyNaturalRefinement(ctx, nosePoints);
-                                    break;
-                                case 'bridge':
-                                    applyBridgeReduction(ctx, nosePoints);
-                                    break;
-                                case 'tip':
-                                    applyTipRefinement(ctx, nosePoints);
-                                    break;
-                                case 'narrow':
-                                    applyNoseNarrowing(ctx, nosePoints);
-                                    break;
-                                case 'straight':
-                                    applyCrookedCorrection(ctx, nosePoints);
-                                    break;
-                                case 'combined':
-                                    applyCombinedEnhancement(ctx, nosePoints);
-                                    break;
-                            }
-                        } else {
-                            console.error('No nose points detected');
-                            alert('Could not detect nose points in the image. Please try another photo or adjust your position.');
-                        }
-                    } else {
-                        // If no landmarks available, use AI-based rhinoplasty simulation
-                        applyAIRhinoplasty(ctx, effectType);
-                    }
+                    // Apply the AI-based rhinoplasty effect
+                    applyAIRhinoplasty(ctx, effectType);
                     
                     // Update the display with the processed image
                     const processedImage = canvas.toDataURL('image/png');
@@ -473,7 +373,7 @@
                     document.getElementById('download-btn').href = processedImage;
                 };
                 
-                img.src = imageData;
+                img.src = originalImage;
             } catch (error) {
                 console.error('Error applying custom effect:', error);
                 alert('Error applying effect: ' + error.message);
@@ -606,29 +506,8 @@
             ctx.putImageData(imageData, 0, 0);
         }
 
-        // Capture and reset
-        document.getElementById('capture').addEventListener('click', async () => {
-            if (isCameraMode && player && capture) {
-                try {
-                    const photo = await capture.takePhoto();
-                    
-                    // Display the result
-                    document.getElementById('result-image').src = photo;
-                    document.getElementById('result-container').style.display = 'block';
-                    document.getElementById('download-btn').href = photo;
-                } catch (error) {
-                    console.error('Failed to capture image:', error);
-                    alert('Failed to capture image: ' + error.message);
-                }
-            } else if (originalImage) {
-                // If we're in upload mode, just show the original image
-                document.getElementById('result-image').src = originalImage;
-                document.getElementById('result-container').style.display = 'block';
-                document.getElementById('download-btn').href = originalImage;
-            }
-        });
-
-        document.getElementById('reset').addEventListener('click', async () => {
+        // Handle reset
+        function handleReset() {
             try {
                 // Reset to original image
                 if (originalImage) {
@@ -636,172 +515,12 @@
                     document.getElementById('result-container').style.display = 'block';
                     document.getElementById('download-btn').href = originalImage;
                     console.log('Reset to original image');
-                } else {
-                    // If no original image, just hide the result
-                    document.getElementById('result-container').style.display = 'none';
                 }
             } catch (error) {
                 console.error('Failed to reset image:', error);
                 alert('Failed to reset image: ' + error.message);
             }
-        });
-
-        // Custom effect functions
-        function applyNaturalRefinement(ctx, nosePoints) {
-            // Create a smooth mask for the nose area
-            ctx.save();
-            ctx.beginPath();
-            ctx.moveTo(nosePoints[0].x, nosePoints[0].y);
-            for (let i = 1; i < nosePoints.length; i++) {
-                ctx.lineTo(nosePoints[i].x, nosePoints[i].y);
-            }
-            ctx.closePath();
-            
-            // Apply brightness adjustment
-            ctx.globalCompositeOperation = 'lighter';
-            ctx.fillStyle = 'rgba(255, 255, 255, 0.1)';
-            ctx.fill();
-            
-            // Apply subtle smoothing
-            ctx.filter = 'blur(2px)';
-            ctx.drawImage(ctx.canvas, 0, 0);
-            
-            ctx.restore();
         }
-
-        function applyBridgeReduction(ctx, nosePoints) {
-            const bridgeTop = nosePoints[0];
-            const bridgeBottom = nosePoints[nosePoints.length - 1];
-            
-            // Calculate vertical shift
-            const shift = (bridgeBottom.y - bridgeTop.y) * 0.2;
-            
-            // Create displacement map
-            ctx.save();
-            ctx.beginPath();
-            ctx.moveTo(bridgeTop.x - 10, bridgeTop.y);
-            ctx.lineTo(bridgeTop.x + 10, bridgeTop.y);
-            ctx.lineTo(bridgeBottom.x + 10, bridgeBottom.y - shift);
-            ctx.lineTo(bridgeBottom.x - 10, bridgeBottom.y - shift);
-            ctx.closePath();
-            
-            // Apply the shift
-            ctx.globalCompositeOperation = 'source-over';
-            ctx.fillStyle = 'rgba(255, 255, 255, 0.1)';
-            ctx.fill();
-            
-            ctx.restore();
-        }
-
-        function applyTipRefinement(ctx, nosePoints) {
-            const tip = nosePoints[nosePoints.length - 1];
-            
-            // Create circular mask for tip
-            ctx.save();
-            ctx.beginPath();
-            ctx.arc(tip.x, tip.y, 15, 0, Math.PI * 2);
-            
-            // Brighten and lift
-            ctx.globalCompositeOperation = 'lighter';
-            ctx.fillStyle = 'rgba(255, 255, 255, 0.2)';
-            ctx.fill();
-            
-            // Apply subtle upward shift
-            ctx.translate(0, -5);
-            ctx.drawImage(ctx.canvas, 0, 0);
-            
-            ctx.restore();
-        }
-
-        function applyNoseNarrowing(ctx, nosePoints) {
-            const left = nosePoints[0];
-            const right = nosePoints[nosePoints.length - 1];
-            
-            // Calculate horizontal shift
-            const shift = (right.x - left.x) * 0.15;
-            
-            // Apply narrowing
-            ctx.save();
-            ctx.beginPath();
-            ctx.moveTo(left.x + shift, left.y);
-            ctx.lineTo(right.x - shift, right.y);
-            ctx.lineTo(right.x, right.y + 20);
-            ctx.lineTo(left.x, left.y + 20);
-            ctx.closePath();
-            
-            ctx.globalCompositeOperation = 'source-over';
-            ctx.fillStyle = 'rgba(255, 255, 255, 0.1)';
-            ctx.fill();
-            
-            ctx.restore();
-        }
-
-        function applyCrookedCorrection(ctx, nosePoints) {
-            const top = nosePoints[0];
-            const bottom = nosePoints[nosePoints.length - 1];
-            
-            // Calculate angle to straighten
-            const dx = bottom.x - top.x;
-            const dy = bottom.y - top.y;
-            const angle = Math.atan2(dx, dy);
-            
-            // Apply rotation
-            ctx.save();
-            ctx.translate(top.x, top.y);
-            ctx.rotate(-angle);
-            ctx.translate(-top.x, -top.y);
-            
-            ctx.beginPath();
-            ctx.moveTo(top.x - 10, top.y);
-            ctx.lineTo(top.x + 10, top.y);
-            ctx.lineTo(bottom.x + 10, bottom.y);
-            ctx.lineTo(bottom.x - 10, bottom.y);
-            ctx.closePath();
-            
-            ctx.globalCompositeOperation = 'source-over';
-            ctx.fillStyle = 'rgba(255, 255, 255, 0.1)';
-            ctx.fill();
-            
-            ctx.restore();
-        }
-
-        function applyCombinedEnhancement(ctx, nosePoints) {
-            // Apply all effects with reduced intensity
-            applyNaturalRefinement(ctx, nosePoints);
-            applyBridgeReduction(ctx, nosePoints);
-            applyTipRefinement(ctx, nosePoints);
-            applyNoseNarrowing(ctx, nosePoints);
-            applyCrookedCorrection(ctx, nosePoints);
-        }
-
-        function getNosePoints(landmarks) {
-            // Check if we have enough landmarks
-            if (!landmarks || landmarks.length < 34) {
-                console.error('Not enough landmarks detected');
-                return [];
-            }
-            
-            try {
-                // Convert landmarks to nose points
-                // Using a more comprehensive set of nose landmarks
-                const noseIndices = [27, 28, 29, 30, 31, 32, 33, 34, 35, 36];
-                return noseIndices.map(i => {
-                    if (i < landmarks.length) {
-                        return {
-                            x: landmarks[i].x * ctx.canvas.width,
-                            y: landmarks[i].y * ctx.canvas.height
-                        };
-                    }
-                    return null;
-                }).filter(point => point !== null);
-            } catch (error) {
-                console.error('Error processing nose points:', error);
-                return [];
-            }
-        }
-
-        // Initialize on page load
-        window.addEventListener('load', initializeBanubaWebAR);
     </script>
 </body>
 </html> 
