@@ -112,8 +112,8 @@ RHINOPLASTY_OPTIONS = {
 
 # Define available AI models
 AI_MODELS = {
-    "banuba": {
-        "name": "Banuba AR",
+    "ar": {
+        "name": "AR Simulation",
         "description": "Advanced AR technology for realistic rhinoplasty simulation",
         "icon": "🤖"
     },
@@ -124,15 +124,15 @@ AI_MODELS = {
     }
 }
 
-def get_banuba_html():
-    """Get the HTML content for the Banuba integration"""
-    html_path = Path(__file__).parent / "banuba_integration.html"
+def get_ar_html():
+    """Get the HTML content for the AR integration"""
+    html_path = Path(__file__).parent / "ar_integration.html"
     with open(html_path, "r", encoding="utf-8") as f:
         html_content = f.read()
     
-    # Get the Banuba client token from Streamlit secrets
-    banuba_token = st.secrets.get("BANUBA_CLIENT_TOKEN", "YOUR_BANUBA_CLIENT_TOKEN")
-    html_content = html_content.replace("YOUR_BANUBA_CLIENT_TOKEN", banuba_token)
+    # Get the AR client token from Streamlit secrets
+    ar_token = st.secrets.get("AR_CLIENT_TOKEN", "YOUR_AR_CLIENT_TOKEN")
+    html_content = html_content.replace("YOUR_AR_CLIENT_TOKEN", ar_token)
     
     return html_content
 
@@ -612,19 +612,19 @@ def main():
     """, unsafe_allow_html=True)
 
     # Create tabs for different simulation methods
-    tab1, tab2 = st.tabs(["Banuba AR Simulation", "Local Processing"])
+    tab1, tab2 = st.tabs(["AR Simulation", "Local Processing"])
     
     with tab1:
         st.markdown("""
             <div class='upload-section'>
-                <h2 style='color: #2c3e50;'>Banuba AR Rhinoplasty Simulation</h2>
+                <h2 style='color: #2c3e50;'>AR Rhinoplasty Simulation</h2>
                 <p style='color: #7f8c8d;'>Use your camera for real-time rhinoplasty simulation</p>
             </div>
         """, unsafe_allow_html=True)
         
-        # Display the Banuba integration
-        banuba_html = get_banuba_html()
-        st.components.v1.html(banuba_html, height=800, scrolling=True)
+        # Display the AR integration
+        ar_html = get_ar_html()
+        st.components.v1.html(ar_html, height=800, scrolling=True)
     
     with tab2:
         # Create two columns for layout
@@ -639,7 +639,7 @@ def main():
             """, unsafe_allow_html=True)
             
             # File uploader with custom styling
-            uploaded_file = st.file_uploader("", type=["jpg", "jpeg", "png"], key="photo_upload")
+            uploaded_file = st.file_uploader("Upload your photo", type=["jpg", "jpeg", "png"], key="photo_upload", label_visibility="collapsed")
 
         with col2:
             st.markdown("""
@@ -715,7 +715,7 @@ def main():
                             """, unsafe_allow_html=True)
                             
                             st.download_button(
-                                label="📥 Download Result",
+                                label="Download Result",
                                 data=byte_im,
                                 file_name=f"rhinoplasty_result_{option.lower().replace(' ', '_')}.png",
                                 mime="image/png"
@@ -726,16 +726,6 @@ def main():
                     st.error("No face detected in the image. Please try another photo.")
             except Exception as e:
                 st.error(f"Error processing image: {str(e)}")
-    
-    # Footer
-    st.markdown("""
-        <div style='text-align: center; padding: 2rem; margin-top: 2rem;'>
-            <p style='color: #7f8c8d;'>
-                This is a simulation tool and should not be used as a substitute for professional medical advice.
-                Please consult with a qualified healthcare provider for medical procedures.
-            </p>
-        </div>
-    """, unsafe_allow_html=True)
 
 if __name__ == "__main__":
     main() 
