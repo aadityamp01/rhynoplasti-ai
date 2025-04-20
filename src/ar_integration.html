@@ -230,11 +230,22 @@
         import { ARRhinoplastySimulator } from './ar_integration.js';
 
         let simulator = null;
-        const clientToken = window.BANUBA_CLIENT_TOKEN || 'YOUR_CLIENT_TOKEN'; // Replace with your token
+        // Get the client token from the window object (set by Streamlit)
+        const clientToken = window.BANUBA_CLIENT_TOKEN || 'YOUR_CLIENT_TOKEN';
+        
+        // Log token status (without exposing the actual token)
+        console.log('Banuba client token available:', !!clientToken && clientToken !== 'YOUR_CLIENT_TOKEN');
 
         // Initialize simulator
         async function initializeSimulator() {
             try {
+                if (!clientToken || clientToken === 'YOUR_CLIENT_TOKEN') {
+                    console.error('Banuba client token is missing or invalid');
+                    document.getElementById('permission-message').textContent = 'Banuba client token is missing. Please check your Streamlit secrets configuration.';
+                    document.getElementById('permission-message').style.display = 'block';
+                    return;
+                }
+                
                 simulator = new ARRhinoplastySimulator(clientToken);
                 const success = await simulator.initialize('ar-container');
                 if (!success) {
@@ -242,6 +253,7 @@
                 }
             } catch (error) {
                 console.error('Failed to initialize simulator:', error);
+                document.getElementById('permission-message').textContent = `Error initializing AR: ${error.message}`;
                 document.getElementById('permission-message').style.display = 'block';
             }
         }

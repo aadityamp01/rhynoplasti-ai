@@ -130,9 +130,11 @@ def get_ar_html():
     with open(html_path, "r", encoding="utf-8") as f:
         html_content = f.read()
     
-    # Get the AR client token from Streamlit secrets
-    ar_token = st.secrets.get("AR_CLIENT_TOKEN", "YOUR_AR_CLIENT_TOKEN")
-    html_content = html_content.replace("YOUR_AR_CLIENT_TOKEN", ar_token)
+    # Get the Banuba client token from Streamlit secrets
+    banuba_token = st.secrets.get("BANUBA_CLIENT_TOKEN", "")
+    
+    # Replace the placeholder in the HTML with the actual token
+    html_content = html_content.replace("'YOUR_CLIENT_TOKEN'", f"'{banuba_token}'")
     
     return html_content
 
@@ -600,6 +602,30 @@ def apply_final_touches(image, mask):
     
     return result
 
+def check_banuba_token():
+    """Check if the Banuba client token is properly set in Streamlit secrets"""
+    try:
+        # Check if the token exists in secrets
+        token_exists = "BANUBA_CLIENT_TOKEN" in st.secrets
+        
+        # Get the token (without exposing it)
+        token = st.secrets.get("BANUBA_CLIENT_TOKEN", "")
+        token_valid = bool(token and token.strip())
+        
+        # Display status
+        if token_exists and token_valid:
+            st.success("✅ Banuba client token is properly configured")
+            return True
+        elif token_exists:
+            st.error("❌ Banuba client token is empty. Please add a valid token to your Streamlit secrets.")
+            return False
+        else:
+            st.error("❌ Banuba client token is missing. Please add BANUBA_CLIENT_TOKEN to your Streamlit secrets.")
+            return False
+    except Exception as e:
+        st.error(f"❌ Error checking Banuba token: {str(e)}")
+        return False
+
 def main():
     # Header
     st.markdown("""
@@ -610,6 +636,9 @@ def main():
             </p>
         </div>
     """, unsafe_allow_html=True)
+
+    # Check Banuba token status
+    banuba_token_status = check_banuba_token()
 
     # Create tabs for different simulation methods
     tab1, tab2 = st.tabs(["AR Simulation", "Local Processing"])

@@ -59,6 +59,17 @@ export class ARRhinoplastySimulator {
 
     async initializeBanubaSDK() {
         try {
+            console.log('Initializing Banuba SDK...');
+            
+            if (!this.clientToken || this.clientToken === 'YOUR_CLIENT_TOKEN') {
+                throw new Error('Invalid or missing Banuba client token');
+            }
+            
+            // Check if Banuba SDK is loaded
+            if (typeof BanubaEffect === 'undefined') {
+                throw new Error('Banuba SDK not loaded. Check if the script is properly included.');
+            }
+            
             // Initialize Banuba SDK with client token
             this.banubaEffect = await BanubaEffect.init({
                 clientToken: this.clientToken,
@@ -66,8 +77,13 @@ export class ARRhinoplastySimulator {
                 video: this.video
             });
             
+            console.log('Banuba SDK initialized successfully');
+            
             // Load default effect
             await this.banubaEffect.loadEffect('rhinoplasty');
+            console.log('Default effect loaded successfully');
+            
+            return true;
         } catch (error) {
             console.error('Failed to initialize Banuba SDK:', error);
             throw error;
