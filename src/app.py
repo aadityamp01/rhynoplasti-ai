@@ -151,58 +151,68 @@ def get_ar_html():
     return html_content
 
 def detect_nose_landmarks(image):
-    try:
-        # Convert the image to RGB
-        image_rgb = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+    """
+    Detect nose landmarks in the image using MediaPipe Face Mesh.
+    
+    Args:
+        image (numpy.ndarray): The input image in BGR format
         
-        # Initialize MediaPipe Face Mesh
-        mp_face_mesh = mp.solutions.face_mesh
-        with mp_face_mesh.FaceMesh(
-            static_image_mode=True,
-            max_num_faces=1,
-            min_detection_confidence=0.5
-        ) as face_mesh:
-            # Process the image
-            results = face_mesh.process(image_rgb)
-            
-            if not results.multi_face_landmarks:
-                return None, None, None
-            
-            # Get all face landmarks
-            face_landmarks = results.multi_face_landmarks[0].landmark
-            
-            # Get nose landmarks (indices 1-10 are typically nose-related)
-            nose_landmarks = face_landmarks[1:11]
-            
-            # Get additional landmarks for better nose shape detection
-            nose_bridge = [face_landmarks[i] for i in [6, 197, 195, 5, 4, 1, 19, 94]]
-            nose_tip = [face_landmarks[i] for i in [1, 2, 98, 97, 2, 326, 327, 331]]
-            nose_side_left = [face_landmarks[i] for i in [129, 209, 49, 131, 134, 45, 4, 1, 19, 94]]
-            nose_side_right = [face_landmarks[i] for i in [358, 429, 279, 359, 362, 275, 4, 1, 19, 94]]
-            
-            # Create a mask
-            mask = np.zeros(image.shape[:2], dtype=np.uint8)
-            
-            # Convert landmarks to pixel coordinates
-            h, w = image.shape[:2]
-            nose_points = np.array([[int(l.x * w), int(l.y * h)] for l in nose_landmarks])
-            
-            # Draw the nose region on the mask
-            cv2.fillConvexPoly(mask, nose_points, 255)
-            
-            # Get the nose region
-            nose_region = cv2.bitwise_and(image, image, mask=mask)
-            
-            # Convert additional landmarks to pixel coordinates
-            nose_bridge_points = np.array([[int(l.x * w), int(l.y * h)] for l in nose_bridge])
-            nose_tip_points = np.array([[int(l.x * w), int(l.y * h)] for l in nose_tip])
-            nose_side_left_points = np.array([[int(l.x * w), int(l.y * h)] for l in nose_side_left])
-            nose_side_right_points = np.array([[int(l.x * w), int(l.y * h)] for l in nose_side_right])
-            
-            return mask, nose_region, (nose_bridge_points, nose_tip_points, nose_side_left_points, nose_side_right_points)
-    except Exception as e:
-        st.error(f"Error in nose landmark detection: {str(e)}")
-        return None, None, None
+    Returns:
+        tuple: (mask, nose_region, landmarks)
+            - mask: Binary mask of the nose region
+            - nose_region: Cropped nose region
+            - landmarks: List of nose landmarks
+    """
+    # Convert the image to RGB
+    image_rgb = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+    
+    # Initialize MediaPipe Face Mesh
+    mp_face_mesh = mp.solutions.face_mesh
+    with mp_face_mesh.FaceMesh(
+        static_image_mode=True,
+        max_num_faces=1,
+        min_detection_confidence=0.5
+    ) as face_mesh:
+        # Process the image
+        results = face_mesh.process(image_rgb)
+        
+        if not results.multi_face_landmarks:
+            return None, None, None
+        
+        # Get all face landmarks
+        face_landmarks = results.multi_face_landmarks[0].landmark
+        
+        # Get nose landmarks (indices 1-10 are typically nose-related)
+        nose_landmarks = face_landmarks[1:11]
+        
+        # Get additional landmarks for better nose shape detection
+        nose_bridge = [face_landmarks[i] for i in [6, 197, 195, 5, 4, 1, 19, 94]]
+        nose_tip = [face_landmarks[i] for i in [1, 2, 98, 97, 2, 326, 327, 331]]
+        nose_side_left = [face_landmarks[i] for i in [129, 209, 49, 131, 134, 45, 4, 1, 19, 94]]
+        nose_side_right = [face_landmarks[i] for i in [358, 429, 279, 359, 362, 275, 4, 1, 19, 94]]
+        
+        # Create a mask
+        mask = np.zeros(image.shape[:2], dtype=np.uint8)
+        
+        # Convert landmarks to pixel coordinates
+        h, w = image.shape[:2]
+        nose_points = np.array([[int(l.x * w), int(l.y * h)] for l in nose_landmarks])
+        
+        # Draw the nose region on the mask
+        cv2.fillConvexPoly(mask, nose_points, 255)
+        
+        # Get the nose region
+        nose_region = cv2.bitwise_and(image, image, mask=mask)
+        
+        # Convert additional landmarks to pixel coordinates
+        nose_bridge_points = np.array([[int(l.x * w), int(l.y * h)] for l in nose_bridge])
+        nose_tip_points = np.array([[int(l.x * w), int(l.y * h)] for l in nose_tip])
+        nose_side_left_points = np.array([[int(l.x * w), int(l.y * h)] for l in nose_side_left])
+        nose_side_right_points = np.array([[int(l.x * w), int(l.y * h)] for l in nose_side_right])
+        
+        # Return the full list of face landmarks for processing
+        # This is what the rhinoplasty functions expect
+        return mask, nose_region, face_landmarks
 
 def simulate_rhinoplasty(image, mask, nose_landmarks, option):
     try:
@@ -245,101 +255,137 @@ def simulate_rhinoplasty(image, mask, nose_landmarks, option):
 
 def apply_natural_refinement(image, mask, landmarks, intensity):
     """Apply subtle natural refinement to the nose."""
-    # Create a smooth mask for the nose area
-    nose_mask = cv2.GaussianBlur(mask, (21, 21), 0)
+    # Check if we have enough landmarks
+    if len(landmarks) < 34:
+        print("Warning: Not enough landmarks detected for natural refinement")
+        return image
     
-    # Apply brightness adjustment
-    brightness_factor = 1.0 + (0.1 * intensity)
-    brightened = cv2.convertScaleAbs(image, alpha=brightness_factor, beta=0)
-    
-    # Apply subtle smoothing
-    smoothed = cv2.GaussianBlur(brightened, (3, 3), 0)
-    
-    # Blend the results
-    result = cv2.addWeighted(image, 1 - intensity, smoothed, intensity, 0)
-    return result
+    try:
+        # Create a smooth mask for the nose area
+        nose_mask = cv2.GaussianBlur(mask, (21, 21), 0)
+        
+        # Apply brightness adjustment
+        brightness_factor = 1.0 + (0.1 * intensity)
+        brightened = cv2.convertScaleAbs(image, alpha=brightness_factor, beta=0)
+        
+        # Apply subtle smoothing
+        smoothed = cv2.GaussianBlur(brightened, (3, 3), 0)
+        
+        # Blend the results
+        result = cv2.addWeighted(image, 1 - intensity, smoothed, intensity, 0)
+        return result
+    except Exception as e:
+        print(f"Error in natural refinement: {e}")
+        return image
 
 def apply_bridge_reduction(image, mask, landmarks, intensity):
     """Reduce the height of the nose bridge."""
-    # Create displacement map for the bridge
-    height, width = image.shape[:2]
-    displacement_map = np.zeros((height, width, 2), dtype=np.float32)
+    # Check if we have enough landmarks
+    if len(landmarks) < 31:
+        print("Warning: Not enough landmarks detected for bridge reduction")
+        return image
     
-    # Get bridge landmarks
-    bridge_top = landmarks[27]  # Nose bridge top
-    bridge_bottom = landmarks[30]  # Nose bridge bottom
-    
-    # Calculate vertical shift
-    shift = int((bridge_bottom[1] - bridge_top[1]) * 0.2 * intensity)
-    
-    # Apply vertical shift to bridge area
-    for y in range(bridge_top[1], bridge_bottom[1]):
-        for x in range(bridge_top[0] - 10, bridge_top[0] + 10):
-            if 0 <= x < width and 0 <= y < height:
-                displacement_map[y, x, 1] = -shift
-    
-    # Apply the displacement
-    result = cv2.remap(image, 
-                      np.arange(width).astype(np.float32),
-                      np.arange(height).astype(np.float32),
-                      displacement_map,
-                      cv2.INTER_LINEAR)
-    
-    # Blend with original
-    return cv2.addWeighted(image, 1 - intensity, result, intensity, 0)
+    try:
+        # Get bridge landmarks
+        bridge_top = landmarks[27]  # Nose bridge top
+        bridge_bottom = landmarks[30]  # Nose bridge bottom
+        
+        # Calculate vertical shift
+        shift = int((bridge_bottom[1] - bridge_top[1]) * 0.2 * intensity)
+        
+        # Create displacement map for the bridge
+        height, width = image.shape[:2]
+        displacement_map = np.zeros((height, width, 2), dtype=np.float32)
+        
+        # Apply vertical shift to bridge area
+        for y in range(bridge_top[1], bridge_bottom[1]):
+            for x in range(bridge_top[0] - 10, bridge_top[0] + 10):
+                if 0 <= x < width and 0 <= y < height:
+                    displacement_map[y, x, 1] = -shift
+        
+        # Apply the displacement
+        result = cv2.remap(image, 
+                          np.arange(width).astype(np.float32),
+                          np.arange(height).astype(np.float32),
+                          displacement_map,
+                          cv2.INTER_LINEAR)
+        
+        # Blend with original
+        return cv2.addWeighted(image, 1 - intensity, result, intensity, 0)
+    except Exception as e:
+        print(f"Error in bridge reduction: {e}")
+        return image
 
 def apply_tip_refinement(image, mask, landmarks, intensity):
     """Refine and lift the nose tip."""
-    # Get tip landmarks
-    tip = landmarks[33]  # Nose tip
+    # Check if we have enough landmarks
+    if len(landmarks) < 34:
+        print("Warning: Not enough landmarks detected for tip refinement")
+        return image
     
-    # Create a circular mask for the tip
-    tip_mask = np.zeros_like(mask)
-    cv2.circle(tip_mask, (tip[0], tip[1]), 15, 255, -1)
-    tip_mask = cv2.GaussianBlur(tip_mask, (21, 21), 0)
-    
-    # Brighten and lift the tip
-    brightened = cv2.convertScaleAbs(image, alpha=1.0 + (0.2 * intensity), beta=0)
-    
-    # Apply subtle upward shift
-    height, width = image.shape[:2]
-    M = np.float32([[1, 0, 0], [0, 1, -5 * intensity]])
-    shifted = cv2.warpAffine(brightened, M, (width, height))
-    
-    # Blend results
-    return cv2.addWeighted(image, 1 - intensity, shifted, intensity, 0)
+    try:
+        # Get tip landmarks
+        tip = landmarks[33]  # Nose tip
+        
+        # Create a circular mask for the tip
+        tip_mask = np.zeros_like(mask)
+        cv2.circle(tip_mask, (tip[0], tip[1]), 15, 255, -1)
+        tip_mask = cv2.GaussianBlur(tip_mask, (21, 21), 0)
+        
+        # Brighten and lift the tip
+        brightened = cv2.convertScaleAbs(image, alpha=1.0 + (0.2 * intensity), beta=0)
+        
+        # Apply subtle upward shift
+        height, width = image.shape[:2]
+        M = np.float32([[1, 0, 0], [0, 1, -5 * intensity]])
+        shifted = cv2.warpAffine(brightened, M, (width, height))
+        
+        # Blend results
+        return cv2.addWeighted(image, 1 - intensity, shifted, intensity, 0)
+    except Exception as e:
+        print(f"Error in tip refinement: {e}")
+        return image
 
 def apply_nose_narrowing(image, mask, landmarks, intensity):
     """Narrow the width of the nose."""
-    # Get nose width landmarks
-    left = landmarks[129]  # Left nostril
-    right = landmarks[358]  # Right nostril
+    # Check if we have enough landmarks
+    if len(landmarks) < 359:
+        print("Warning: Not enough landmarks detected for nose narrowing")
+        return image
     
-    # Create horizontal displacement map
-    height, width = image.shape[:2]
-    displacement_map = np.zeros((height, width, 2), dtype=np.float32)
-    
-    # Calculate horizontal shift
-    shift = int((right[0] - left[0]) * 0.15 * intensity)
-    
-    # Apply horizontal shift to nose sides
-    for x in range(left[0], right[0]):
-        for y in range(left[1] - 20, left[1] + 20):
-            if 0 <= x < width and 0 <= y < height:
-                if x < (left[0] + right[0]) // 2:
-                    displacement_map[y, x, 0] = shift
-                else:
-                    displacement_map[y, x, 0] = -shift
-    
-    # Apply the displacement
-    result = cv2.remap(image,
-                      np.arange(width).astype(np.float32),
-                      np.arange(height).astype(np.float32),
-                      displacement_map,
-                      cv2.INTER_LINEAR)
-    
-    # Blend with original
-    return cv2.addWeighted(image, 1 - intensity, result, intensity, 0)
+    try:
+        # Get nose width landmarks
+        left = landmarks[129]  # Left nostril
+        right = landmarks[358]  # Right nostril
+        
+        # Create horizontal displacement map
+        height, width = image.shape[:2]
+        displacement_map = np.zeros((height, width, 2), dtype=np.float32)
+        
+        # Calculate horizontal shift
+        shift = int((right[0] - left[0]) * 0.15 * intensity)
+        
+        # Apply horizontal shift to nose sides
+        for x in range(left[0], right[0]):
+            for y in range(left[1] - 20, left[1] + 20):
+                if 0 <= x < width and 0 <= y < height:
+                    if x < (left[0] + right[0]) // 2:
+                        displacement_map[y, x, 0] = shift
+                    else:
+                        displacement_map[y, x, 0] = -shift
+        
+        # Apply the displacement
+        result = cv2.remap(image,
+                          np.arange(width).astype(np.float32),
+                          np.arange(height).astype(np.float32),
+                          displacement_map,
+                          cv2.INTER_LINEAR)
+        
+        # Blend with original
+        return cv2.addWeighted(image, 1 - intensity, result, intensity, 0)
+    except Exception as e:
+        print(f"Error in nose narrowing: {e}")
+        return image
 
 def apply_crooked_correction(image, mask, landmarks, intensity):
     """Correct crooked nose by straightening the bridge."""
@@ -382,16 +428,25 @@ def apply_crooked_correction(image, mask, landmarks, intensity):
 
 def apply_combined_enhancement(image, mask, landmarks, intensity):
     """Apply a combination of all enhancements."""
-    # Apply each effect with reduced intensity
-    reduced_intensity = intensity * 0.7
+    # Check if we have enough landmarks
+    if len(landmarks) < 359:
+        print("Warning: Not enough landmarks detected for combined enhancement")
+        return image
     
-    result = apply_natural_refinement(image, mask, landmarks, reduced_intensity)
-    result = apply_bridge_reduction(result, mask, landmarks, reduced_intensity)
-    result = apply_tip_refinement(result, mask, landmarks, reduced_intensity)
-    result = apply_nose_narrowing(result, mask, landmarks, reduced_intensity)
-    result = apply_crooked_correction(result, mask, landmarks, reduced_intensity)
-    
-    return result
+    try:
+        # Apply each effect with reduced intensity
+        reduced_intensity = intensity * 0.7
+        
+        result = apply_natural_refinement(image, mask, landmarks, reduced_intensity)
+        result = apply_bridge_reduction(result, mask, landmarks, reduced_intensity)
+        result = apply_tip_refinement(result, mask, landmarks, reduced_intensity)
+        result = apply_nose_narrowing(result, mask, landmarks, reduced_intensity)
+        result = apply_crooked_correction(result, mask, landmarks, reduced_intensity)
+        
+        return result
+    except Exception as e:
+        print(f"Error in combined enhancement: {e}")
+        return image
 
 def apply_final_touches(image, mask):
     # Create a copy of the image
@@ -465,22 +520,27 @@ def process_image(image, option, intensity):
         raise ValueError("No face detected in the image. Please try another photo.")
     
     # Apply the selected rhinoplasty option
-    if option == "Natural Refinement":
-        result = apply_natural_refinement(image_cv, mask, nose_landmarks, intensity)
-    elif option == "Nose Bridge Reduction":
-        result = apply_bridge_reduction(image_cv, mask, nose_landmarks, intensity)
-    elif option == "Tip Refinement":
-        result = apply_tip_refinement(image_cv, mask, nose_landmarks, intensity)
-    elif option == "Wide Nose Narrowing":
-        result = apply_nose_narrowing(image_cv, mask, nose_landmarks, intensity)
-    elif option == "Crooked Nose Correction":
-        result = apply_crooked_correction(image_cv, mask, nose_landmarks, intensity)
-    else:  # Combined Enhancement
-        result = apply_combined_enhancement(image_cv, mask, nose_landmarks, intensity)
-    
-    # Convert back to PIL Image
-    result_rgb = cv2.cvtColor(result, cv2.COLOR_BGR2RGB)
-    return Image.fromarray(result_rgb)
+    try:
+        if option == "Natural Refinement":
+            result = apply_natural_refinement(image_cv, mask, nose_landmarks, intensity)
+        elif option == "Nose Bridge Reduction":
+            result = apply_bridge_reduction(image_cv, mask, nose_landmarks, intensity)
+        elif option == "Tip Refinement":
+            result = apply_tip_refinement(image_cv, mask, nose_landmarks, intensity)
+        elif option == "Wide Nose Narrowing":
+            result = apply_nose_narrowing(image_cv, mask, nose_landmarks, intensity)
+        elif option == "Crooked Nose Correction":
+            result = apply_crooked_correction(image_cv, mask, nose_landmarks, intensity)
+        else:  # Combined Enhancement
+            result = apply_combined_enhancement(image_cv, mask, nose_landmarks, intensity)
+        
+        # Convert back to PIL Image
+        result_rgb = cv2.cvtColor(result, cv2.COLOR_BGR2RGB)
+        return Image.fromarray(result_rgb)
+    except Exception as e:
+        print(f"Error processing image: {e}")
+        # Return the original image if processing fails
+        return image
 
 def main():
     # Header
