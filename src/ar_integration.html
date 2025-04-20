@@ -103,82 +103,13 @@
         .download-btn:hover {
             background-color: #2980b9;
         }
-        .input-group {
-            margin-bottom: 20px;
-        }
-        .input-group input[type="file"] {
-            display: none;
-        }
-        .input-group label {
-            display: block;
-            padding: 10px;
-            background-color: #3498db;
-            color: white;
-            text-align: center;
-            border-radius: 5px;
-            cursor: pointer;
-        }
-        .input-group label:hover {
-            background-color: #2980b9;
-        }
-        .permission-message {
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            background: rgba(0, 0, 0, 0.8);
-            color: white;
-            padding: 20px;
-            border-radius: 5px;
-            text-align: center;
-            display: none;
-        }
-        .mode-switch {
-            position: absolute;
-            top: 20px;
-            right: 20px;
-            display: flex;
-            gap: 10px;
-            background: rgba(0, 0, 0, 0.5);
-            padding: 10px;
-            border-radius: 5px;
-        }
-        .mode-switch button {
-            padding: 8px 16px;
-            border: none;
-            border-radius: 4px;
-            cursor: pointer;
-            background: #4CAF50;
-            color: white;
-        }
-        .mode-switch button.active {
-            background: #2196F3;
-        }
-        .upload-container {
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            background: rgba(0, 0, 0, 0.8);
-            color: white;
-            padding: 20px;
-            border-radius: 5px;
-            text-align: center;
-            display: none;
-        }
-        .upload-container input[type="file"] {
-            display: none;
-        }
-        .upload-container label {
-            display: inline-block;
-            padding: 10px 20px;
-            background: #4CAF50;
-            color: white;
-            border-radius: 4px;
-            cursor: pointer;
-        }
-        .upload-container label:hover {
-            background: #45a049;
+        #webar-app {
+            width: 100%;
+            max-width: 640px;
+            height: 480px;
+            margin: 0 auto;
+            border-radius: 8px;
+            overflow: hidden;
         }
     </style>
 </head>
@@ -199,7 +130,8 @@
             Camera permission is required for AR simulation. Please allow camera access.
         </div>
         
-        <div class="video-container" id="ar-container"></div>
+        <!-- Banuba WebAR container -->
+        <div id="webar-app"></div>
         
         <div class="effect-buttons">
             <button id="natural-refinement">Natural Refinement</button>
@@ -227,107 +159,153 @@
     
     <!-- AR Integration -->
     <script type="module">
-        import { ARRhinoplastySimulator } from './ar_integration.js';
+        import { Webcam, Player, Module, Effect, Dom, ImageCapture } from "https://cdn.jsdelivr.net/npm/@banuba/webar/dist/BanubaSDK.browser.esm.js";
 
-        let simulator = null;
-        // Get the client token from the window object (set by Streamlit)
+        let player = null;
+        let capture = null;
         const clientToken = window.BANUBA_CLIENT_TOKEN || 'YOUR_CLIENT_TOKEN';
         
         // Log token status (without exposing the actual token)
         console.log('Banuba client token available:', !!clientToken && clientToken !== 'YOUR_CLIENT_TOKEN');
 
-        // Initialize simulator
-        async function initializeSimulator() {
+        // Initialize Banuba WebAR
+        async function initializeBanubaWebAR() {
             try {
                 if (!clientToken || clientToken === 'YOUR_CLIENT_TOKEN') {
                     console.error('Banuba client token is missing or invalid');
                     document.getElementById('permission-message').textContent = 'Banuba client token is missing. Please check your Streamlit secrets configuration.';
                     document.getElementById('permission-message').style.display = 'block';
-                    return;
+                    return false;
                 }
                 
-                simulator = new ARRhinoplastySimulator(clientToken);
-                const success = await simulator.initialize('ar-container');
-                if (!success) {
-                    document.getElementById('permission-message').style.display = 'block';
-                }
+                // Create player
+                player = await Player.create({ clientToken: clientToken });
+                
+                // Add face tracking module
+                await player.addModule(new Module("https://cdn.jsdelivr.net/npm/@banuba/webar/dist/modules/face_tracker.zip"));
+                
+                // Use webcam
+                await player.use(new Webcam());
+                
+                // Apply default effect
+                player.applyEffect(new Effect("rhinoplasty.zip"));
+                
+                // Render to DOM
+                Dom.render(player, "#webar-app");
+                
+                // Initialize image capture
+                capture = new ImageCapture(player);
+                
+                console.log('Banuba WebAR initialized successfully');
+                return true;
             } catch (error) {
-                console.error('Failed to initialize simulator:', error);
+                console.error('Failed to initialize Banuba WebAR:', error);
                 document.getElementById('permission-message').textContent = `Error initializing AR: ${error.message}`;
                 document.getElementById('permission-message').style.display = 'block';
+                return false;
             }
         }
 
         // Mode switching
         document.getElementById('camera-mode').addEventListener('click', async () => {
-            if (simulator) {
-                await simulator.stop();
-            }
             document.getElementById('image-upload').style.display = 'none';
             document.getElementById('camera-mode').classList.add('active');
             document.getElementById('upload-mode').classList.remove('active');
-            await initializeSimulator();
+            
+            // Reinitialize WebAR for camera mode
+            if (player) {
+                await player.dispose();
+                player = null;
+            }
+            
+            await initializeBanubaWebAR();
         });
 
         document.getElementById('upload-mode').addEventListener('click', () => {
             document.getElementById('image-upload').style.display = 'block';
             document.getElementById('upload-mode').classList.add('active');
             document.getElementById('camera-mode').classList.remove('active');
+            
+            // Dispose of WebAR player
+            if (player) {
+                player.dispose();
+                player = null;
+            }
         });
 
         // Image upload handling
         document.getElementById('image-upload').addEventListener('change', async (event) => {
             const file = event.target.files[0];
             if (file) {
-                const img = new Image();
-                img.onload = async () => {
-                    if (simulator) {
-                        await simulator.loadImage(img);
-                    }
-                };
-                img.src = URL.createObjectURL(file);
+                // Create a URL for the file
+                const imageUrl = URL.createObjectURL(file);
+                
+                // Initialize player if not already initialized
+                if (!player) {
+                    player = await Player.create({ clientToken: clientToken });
+                    await player.addModule(new Module("https://cdn.jsdelivr.net/npm/@banuba/webar/dist/modules/face_tracker.zip"));
+                    Dom.render(player, "#webar-app");
+                    capture = new ImageCapture(player);
+                }
+                
+                // Load the image
+                await player.loadImage(imageUrl);
             }
         });
 
         // Effect buttons
-        const effects = [
-            'natural-refinement',
-            'bridge-reduction',
-            'tip-refinement',
-            'nose-narrowing',
-            'crooked-correction',
-            'combined-enhancement'
-        ];
+        const effects = {
+            'natural-refinement': 'natural_refinement.zip',
+            'bridge-reduction': 'bridge_reduction.zip',
+            'tip-refinement': 'tip_refinement.zip',
+            'nose-narrowing': 'nose_narrowing.zip',
+            'crooked-correction': 'crooked_correction.zip',
+            'combined-enhancement': 'combined_enhancement.zip'
+        };
 
-        effects.forEach(effect => {
-            document.getElementById(effect).addEventListener('click', async () => {
-                if (simulator) {
-                    await simulator.applyEffect(effect.replace('-', ' '));
+        Object.keys(effects).forEach(effectId => {
+            document.getElementById(effectId).addEventListener('click', async () => {
+                if (player) {
+                    try {
+                        player.applyEffect(new Effect(effects[effectId]));
+                        console.log(`Applied effect: ${effects[effectId]}`);
+                    } catch (error) {
+                        console.error(`Failed to apply effect ${effects[effectId]}:`, error);
+                    }
                 }
             });
         });
 
         // Capture and reset
         document.getElementById('capture').addEventListener('click', async () => {
-            if (simulator) {
-                const imageData = await simulator.captureImage();
-                if (imageData) {
-                    const link = document.createElement('a');
-                    link.download = 'rhinoplasty-result.png';
-                    link.href = imageData;
-                    link.click();
+            if (player && capture) {
+                try {
+                    const photo = await capture.takePhoto();
+                    
+                    // Display the result
+                    document.getElementById('result-image').src = photo;
+                    document.getElementById('result-container').style.display = 'block';
+                    document.getElementById('download-btn').href = photo;
+                } catch (error) {
+                    console.error('Failed to capture image:', error);
                 }
             }
         });
 
         document.getElementById('reset').addEventListener('click', async () => {
-            if (simulator) {
-                simulator.resetImage();
+            if (player) {
+                try {
+                    // Reset to default effect
+                    player.applyEffect(new Effect("rhinoplasty.zip"));
+                    console.log('Reset to default effect');
+                } catch (error) {
+                    console.error('Failed to reset effect:', error);
+                }
             }
         });
 
         // Initialize on page load
-        window.addEventListener('load', initializeSimulator);
+        window.addEventListener('load', initializeBanubaWebAR);
     </script>
 </body>
 </html> 
