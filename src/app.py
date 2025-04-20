@@ -635,7 +635,7 @@ def main():
                 st.markdown("""
                     <h3 style='color: #2c3e50; text-align: center;'>Before</h3>
                 """, unsafe_allow_html=True)
-                st.image(image, channels="BGR", use_column_width=True)
+                st.image(image, channels="BGR", use_container_width=True)
             
             # Detect nose landmarks and create mask
             mask, nose_region, nose_landmarks = detect_nose_landmarks(image)
@@ -650,7 +650,7 @@ def main():
                             st.markdown("""
                                 <h3 style='color: #2c3e50; text-align: center;'>After</h3>
                             """, unsafe_allow_html=True)
-                            st.image(result_image, channels="BGR", use_column_width=True)
+                            st.image(result_image, channels="BGR", use_container_width=True)
                         
                         # Add download button with custom styling
                         result_rgb = cv2.cvtColor(result_image, cv2.COLOR_BGR2RGB)
