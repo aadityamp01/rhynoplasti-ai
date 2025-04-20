@@ -4,6 +4,7 @@ from PIL import Image
 import io
 import os
 import tempfile
+import time
 
 try:
     import cv2
@@ -11,9 +12,31 @@ try:
     from diffusers import StableDiffusionInpaintPipeline
     import torch
     OPENCV_AVAILABLE = True
+    STABLE_DIFFUSION_AVAILABLE = True
 except ImportError as e:
     st.error(f"Error importing required libraries: {str(e)}")
     OPENCV_AVAILABLE = False
+    STABLE_DIFFUSION_AVAILABLE = False
+
+# Global variable to store the model
+@st.cache_resource
+def load_model():
+    try:
+        # Load the Stable Diffusion model
+        pipe = StableDiffusionInpaintPipeline.from_pretrained(
+            "runwayml/stable-diffusion-inpainting",
+            torch_dtype=torch.float16 if torch.cuda.is_available() else torch.float32,
+            safety_checker=None  # Disable safety checker for better performance
+        )
+        
+        # Move to GPU if available
+        if torch.cuda.is_available():
+            pipe = pipe.to("cuda")
+        
+        return pipe
+    except Exception as e:
+        st.error(f"Error loading Stable Diffusion model: {str(e)}")
+        return None
 
 def detect_nose_landmarks(image):
     if not OPENCV_AVAILABLE:
@@ -57,19 +80,18 @@ def detect_nose_landmarks(image):
 
 def generate_rhinoplasty_image(image, mask):
     try:
+        if not STABLE_DIFFUSION_AVAILABLE:
+            st.error("Stable Diffusion is not available. Please check the installation.")
+            return None
+            
+        # Get the model from cache
+        pipe = load_model()
+        if pipe is None:
+            return None
+            
         # Convert image to PIL format
         image_pil = Image.fromarray(cv2.cvtColor(image, cv2.COLOR_BGR2RGB))
         mask_pil = Image.fromarray(mask)
-        
-        # Load the Stable Diffusion model
-        pipe = StableDiffusionInpaintPipeline.from_pretrained(
-            "runwayml/stable-diffusion-inpainting",
-            torch_dtype=torch.float16 if torch.cuda.is_available() else torch.float32
-        )
-        
-        # Move to GPU if available
-        if torch.cuda.is_available():
-            pipe = pipe.to("cuda")
         
         # Create the prompt
         prompt = "a natural-looking nose after rhinoplasty, subtle refinement, realistic, high quality, detailed"
@@ -82,7 +104,7 @@ def generate_rhinoplasty_image(image, mask):
                 negative_prompt=negative_prompt,
                 image=image_pil,
                 mask_image=mask_pil,
-                num_inference_steps=30,
+                num_inference_steps=20,  # Reduced for faster generation
                 guidance_scale=7.5
             ).images[0]
         
@@ -96,7 +118,7 @@ def main():
     st.write("Upload a photo to see how you might look after rhinoplasty")
     
     if not OPENCV_AVAILABLE:
-        st.error("Required libraries are not available. Please check the installation.")
+        st.error("OpenCV is not available. Please check the installation.")
         return
     
     # File uploader
