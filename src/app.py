@@ -134,8 +134,18 @@ def get_ar_html():
     # Get the Banuba client token from Streamlit secrets
     banuba_token = st.secrets.get("BANUBA_CLIENT_TOKEN", "")
     
-    # Replace the placeholder in the HTML with the actual token
-    html_content = html_content.replace("'YOUR_CLIENT_TOKEN'", f"'{banuba_token}'")
+    # Add a script tag to set the global token variable
+    token_script = f"""
+    <script>
+        window.BANUBA_CLIENT_TOKEN = "{banuba_token}";
+    </script>
+    """
+    
+    # Insert the token script before the AR Integration script
+    html_content = html_content.replace(
+        '<!-- AR Integration -->',
+        f'<!-- AR Integration -->\n{token_script}'
+    )
     
     # Check if effect files exist and update paths if needed
     effects_dir = Path(__file__).parent / "effects"

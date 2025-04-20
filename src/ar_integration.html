@@ -163,15 +163,17 @@
 
         let player = null;
         let capture = null;
-        const clientToken = window.BANUBA_CLIENT_TOKEN || 'YOUR_CLIENT_TOKEN';
+        
+        // Get the token from the global variable
+        const clientToken = window.BANUBA_CLIENT_TOKEN;
         
         // Log token status (without exposing the actual token)
-        console.log('Banuba client token available:', !!clientToken && clientToken !== 'YOUR_CLIENT_TOKEN');
+        console.log('Banuba client token available:', !!clientToken);
 
         // Initialize Banuba WebAR
         async function initializeBanubaWebAR() {
             try {
-                if (!clientToken || clientToken === 'YOUR_CLIENT_TOKEN') {
+                if (!clientToken) {
                     console.error('Banuba client token is missing or invalid');
                     document.getElementById('permission-message').textContent = 'Banuba client token is missing. Please check your Streamlit secrets configuration.';
                     document.getElementById('permission-message').style.display = 'block';
