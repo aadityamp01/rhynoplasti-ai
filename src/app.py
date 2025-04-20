@@ -5,6 +5,8 @@ import io
 import os
 import cv2
 import mediapipe as mp
+from scipy.interpolate import griddata
+import random
 
 # Set page config
 st.set_page_config(
@@ -69,27 +71,33 @@ st.markdown("""
 RHINOPLASTY_OPTIONS = {
     "Natural Refinement": {
         "description": "Subtle changes to create a more balanced nose while maintaining natural appearance",
-        "icon": "✨"
+        "icon": "✨",
+        "intensity": 0.5
     },
     "Nose Bridge Reduction": {
         "description": "Reduce the height of the nose bridge for a more streamlined profile",
-        "icon": "📉"
+        "icon": "📉",
+        "intensity": 0.7
     },
     "Tip Refinement": {
         "description": "Refine the nose tip to be more defined and elegant",
-        "icon": "🎯"
+        "icon": "🎯",
+        "intensity": 0.6
     },
     "Wide Nose Narrowing": {
         "description": "Narrow a wide nose for better facial harmony",
-        "icon": "↔️"
+        "icon": "↔️",
+        "intensity": 0.8
     },
     "Crooked Nose Correction": {
         "description": "Straighten a crooked nose for better symmetry",
-        "icon": "📏"
+        "icon": "📏",
+        "intensity": 0.7
     },
     "Combined Enhancement": {
         "description": "Comprehensive nose reshaping with multiple refinements",
-        "icon": "🌟"
+        "icon": "🌟",
+        "intensity": 0.6
     }
 }
 
@@ -120,6 +128,8 @@ def detect_nose_landmarks(image):
             # Get additional landmarks for better nose shape detection
             nose_bridge = [face_landmarks[i] for i in [6, 197, 195, 5, 4, 1, 19, 94]]
             nose_tip = [face_landmarks[i] for i in [1, 2, 98, 97, 2, 326, 327, 331]]
+            nose_side_left = [face_landmarks[i] for i in [129, 209, 49, 131, 134, 45, 4, 1, 19, 94]]
+            nose_side_right = [face_landmarks[i] for i in [358, 429, 279, 359, 362, 275, 4, 1, 19, 94]]
             
             # Create a mask
             mask = np.zeros(image.shape[:2], dtype=np.uint8)
@@ -137,8 +147,10 @@ def detect_nose_landmarks(image):
             # Convert additional landmarks to pixel coordinates
             nose_bridge_points = np.array([[int(l.x * w), int(l.y * h)] for l in nose_bridge])
             nose_tip_points = np.array([[int(l.x * w), int(l.y * h)] for l in nose_tip])
+            nose_side_left_points = np.array([[int(l.x * w), int(l.y * h)] for l in nose_side_left])
+            nose_side_right_points = np.array([[int(l.x * w), int(l.y * h)] for l in nose_side_right])
             
-            return mask, nose_region, (nose_bridge_points, nose_tip_points)
+            return mask, nose_region, (nose_bridge_points, nose_tip_points, nose_side_left_points, nose_side_right_points)
     except Exception as e:
         st.error(f"Error in nose landmark detection: {str(e)}")
         return None, None, None
@@ -149,68 +161,95 @@ def simulate_rhinoplasty(image, mask, nose_landmarks, option):
         result = image.copy()
         
         # Get nose bridge and tip points
-        nose_bridge_points, nose_tip_points = nose_landmarks
+        nose_bridge_points, nose_tip_points, nose_side_left_points, nose_side_right_points = nose_landmarks
+        
+        # Get the intensity for the selected option
+        intensity = RHINOPLASTY_OPTIONS[option]["intensity"]
         
         # Apply different rhinoplasty simulations based on the selected option
         if option == "Natural Refinement":
             # Subtle changes to create a more balanced nose
-            result = apply_natural_refinement(result, mask, nose_bridge_points, nose_tip_points)
+            result = apply_natural_refinement(result, mask, nose_bridge_points, nose_tip_points, intensity)
         elif option == "Nose Bridge Reduction":
             # Reduce the height of the nose bridge
-            result = apply_bridge_reduction(result, mask, nose_bridge_points)
+            result = apply_bridge_reduction(result, mask, nose_bridge_points, intensity)
         elif option == "Tip Refinement":
             # Refine the nose tip
-            result = apply_tip_refinement(result, mask, nose_tip_points)
+            result = apply_tip_refinement(result, mask, nose_tip_points, intensity)
         elif option == "Wide Nose Narrowing":
             # Narrow a wide nose
-            result = apply_nose_narrowing(result, mask, nose_bridge_points, nose_tip_points)
+            result = apply_nose_narrowing(result, mask, nose_bridge_points, nose_tip_points, nose_side_left_points, nose_side_right_points, intensity)
         elif option == "Crooked Nose Correction":
             # Straighten a crooked nose
-            result = apply_crooked_correction(result, mask, nose_bridge_points)
+            result = apply_crooked_correction(result, mask, nose_bridge_points, intensity)
         elif option == "Combined Enhancement":
             # Apply multiple refinements
-            result = apply_combined_enhancement(result, mask, nose_bridge_points, nose_tip_points)
+            result = apply_combined_enhancement(result, mask, nose_bridge_points, nose_tip_points, nose_side_left_points, nose_side_right_points, intensity)
+        
+        # Apply final touches for realism
+        result = apply_final_touches(result, mask)
         
         return result
     except Exception as e:
         st.error(f"Error in rhinoplasty simulation: {str(e)}")
         return image
 
-def apply_natural_refinement(image, mask, nose_bridge_points, nose_tip_points):
+def apply_natural_refinement(image, mask, nose_bridge_points, nose_tip_points, intensity=0.5):
     # Create a copy of the image
     result = image.copy()
     
+    # Create a mask for the nose
+    nose_mask = np.zeros(image.shape[:2], dtype=np.uint8)
+    cv2.fillPoly(nose_mask, [nose_bridge_points, nose_tip_points], 255)
+    
     # Apply a slight blur to the nose region to simulate smoothing
-    nose_region = cv2.bitwise_and(result, result, mask=mask)
+    nose_region = cv2.bitwise_and(result, result, mask=nose_mask)
     blurred_nose = cv2.GaussianBlur(nose_region, (5, 5), 0)
     
     # Apply a slight brightness increase to the nose region
     hsv = cv2.cvtColor(blurred_nose, cv2.COLOR_BGR2HSV)
-    hsv[:, :, 2] = hsv[:, :, 2] * 1.05  # Increase brightness by 5%
+    hsv[:, :, 2] = hsv[:, :, 2] * (1 + 0.05 * intensity)  # Increase brightness by 5% * intensity
     brightened_nose = cv2.cvtColor(hsv, cv2.COLOR_HSV2BGR)
     
     # Apply the modified nose region back to the image
-    result = cv2.bitwise_and(result, result, mask=cv2.bitwise_not(mask))
+    result = cv2.bitwise_and(result, result, mask=cv2.bitwise_not(nose_mask))
     result = cv2.add(result, brightened_nose)
     
     # Apply a slight contour adjustment to simulate a more defined nose
     kernel = np.ones((3, 3), np.uint8)
-    dilated_mask = cv2.dilate(mask, kernel, iterations=1)
-    contour_mask = cv2.bitwise_xor(dilated_mask, mask)
+    dilated_mask = cv2.dilate(nose_mask, kernel, iterations=1)
+    contour_mask = cv2.bitwise_xor(dilated_mask, nose_mask)
     
     # Apply a slight darkening to the contour to create definition
     contour_region = cv2.bitwise_and(result, result, mask=contour_mask)
     hsv_contour = cv2.cvtColor(contour_region, cv2.COLOR_BGR2HSV)
-    hsv_contour[:, :, 2] = hsv_contour[:, :, 2] * 0.95  # Decrease brightness by 5%
+    hsv_contour[:, :, 2] = hsv_contour[:, :, 2] * (1 - 0.05 * intensity)  # Decrease brightness by 5% * intensity
     darkened_contour = cv2.cvtColor(hsv_contour, cv2.COLOR_HSV2BGR)
     
     # Apply the contour adjustment
     result = cv2.bitwise_and(result, result, mask=cv2.bitwise_not(contour_mask))
     result = cv2.add(result, darkened_contour)
     
+    # Apply a slight nose tip refinement
+    tip_mask = np.zeros(image.shape[:2], dtype=np.uint8)
+    cv2.fillPoly(tip_mask, [nose_tip_points], 255)
+    
+    # Apply a slight blur to the nose tip region
+    tip_region = cv2.bitwise_and(result, result, mask=tip_mask)
+    blurred_tip = cv2.GaussianBlur(tip_region, (5, 5), 0)
+    
+    # Apply a slight brightness increase to the nose tip region
+    hsv_tip = cv2.cvtColor(blurred_tip, cv2.COLOR_BGR2HSV)
+    hsv_tip[:, :, 2] = hsv_tip[:, :, 2] * (1 + 0.1 * intensity)  # Increase brightness by 10% * intensity
+    brightened_tip = cv2.cvtColor(hsv_tip, cv2.COLOR_HSV2BGR)
+    
+    # Apply the modified nose tip region back to the image
+    result = cv2.bitwise_and(result, result, mask=cv2.bitwise_not(tip_mask))
+    result = cv2.add(result, brightened_tip)
+    
     return result
 
-def apply_bridge_reduction(image, mask, nose_bridge_points):
+def apply_bridge_reduction(image, mask, nose_bridge_points, intensity=0.7):
     # Create a copy of the image
     result = image.copy()
     
@@ -224,16 +263,63 @@ def apply_bridge_reduction(image, mask, nose_bridge_points):
     
     # Apply a slight brightness increase to the nose bridge region
     hsv = cv2.cvtColor(blurred_bridge, cv2.COLOR_BGR2HSV)
-    hsv[:, :, 2] = hsv[:, :, 2] * 1.1  # Increase brightness by 10%
+    hsv[:, :, 2] = hsv[:, :, 2] * (1 + 0.1 * intensity)  # Increase brightness by 10% * intensity
     brightened_bridge = cv2.cvtColor(hsv, cv2.COLOR_HSV2BGR)
     
     # Apply the modified nose bridge region back to the image
     result = cv2.bitwise_and(result, result, mask=cv2.bitwise_not(bridge_mask))
     result = cv2.add(result, brightened_bridge)
     
+    # Apply a slight contour adjustment to simulate a more defined nose bridge
+    kernel = np.ones((3, 3), np.uint8)
+    dilated_mask = cv2.dilate(bridge_mask, kernel, iterations=1)
+    contour_mask = cv2.bitwise_xor(dilated_mask, bridge_mask)
+    
+    # Apply a slight darkening to the contour to create definition
+    contour_region = cv2.bitwise_and(result, result, mask=contour_mask)
+    hsv_contour = cv2.cvtColor(contour_region, cv2.COLOR_BGR2HSV)
+    hsv_contour[:, :, 2] = hsv_contour[:, :, 2] * (1 - 0.1 * intensity)  # Decrease brightness by 10% * intensity
+    darkened_contour = cv2.cvtColor(hsv_contour, cv2.COLOR_HSV2BGR)
+    
+    # Apply the contour adjustment
+    result = cv2.bitwise_and(result, result, mask=cv2.bitwise_not(contour_mask))
+    result = cv2.add(result, darkened_contour)
+    
+    # Apply a slight nose bridge reduction using warping
+    h, w = image.shape[:2]
+    
+    # Create a grid of points
+    x = np.linspace(0, w-1, w)
+    y = np.linspace(0, h-1, h)
+    xx, yy = np.meshgrid(x, y)
+    
+    # Create a displacement map for the nose bridge
+    displacement = np.zeros((h, w, 2), dtype=np.float32)
+    
+    # Calculate the center of the nose bridge
+    center_x = np.mean(nose_bridge_points[:, 0])
+    center_y = np.mean(nose_bridge_points[:, 1])
+    
+    # Apply a vertical displacement to reduce the nose bridge height
+    for i in range(h):
+        for j in range(w):
+            # Calculate the distance from the center of the nose bridge
+            dist = np.sqrt((j - center_x)**2 + (i - center_y)**2)
+            
+            # Apply a displacement based on the distance
+            if dist < 50 * intensity:  # Adjust the radius based on intensity
+                # Calculate the displacement factor
+                factor = 1 - (dist / (50 * intensity))
+                
+                # Apply a vertical displacement to reduce the nose bridge height
+                displacement[i, j, 1] = -10 * factor * intensity  # Adjust the magnitude based on intensity
+    
+    # Apply the displacement map
+    result = cv2.remap(result, xx.astype(np.float32), yy.astype(np.float32) + displacement[:, :, 1], cv2.INTER_LINEAR)
+    
     return result
 
-def apply_tip_refinement(image, mask, nose_tip_points):
+def apply_tip_refinement(image, mask, nose_tip_points, intensity=0.6):
     # Create a copy of the image
     result = image.copy()
     
@@ -247,7 +333,7 @@ def apply_tip_refinement(image, mask, nose_tip_points):
     
     # Apply a slight brightness increase to the nose tip region
     hsv = cv2.cvtColor(blurred_tip, cv2.COLOR_BGR2HSV)
-    hsv[:, :, 2] = hsv[:, :, 2] * 1.15  # Increase brightness by 15%
+    hsv[:, :, 2] = hsv[:, :, 2] * (1 + 0.15 * intensity)  # Increase brightness by 15% * intensity
     brightened_tip = cv2.cvtColor(hsv, cv2.COLOR_HSV2BGR)
     
     # Apply the modified nose tip region back to the image
@@ -262,16 +348,48 @@ def apply_tip_refinement(image, mask, nose_tip_points):
     # Apply a slight darkening to the contour to create definition
     contour_region = cv2.bitwise_and(result, result, mask=contour_mask)
     hsv_contour = cv2.cvtColor(contour_region, cv2.COLOR_BGR2HSV)
-    hsv_contour[:, :, 2] = hsv_contour[:, :, 2] * 0.9  # Decrease brightness by 10%
+    hsv_contour[:, :, 2] = hsv_contour[:, :, 2] * (1 - 0.1 * intensity)  # Decrease brightness by 10% * intensity
     darkened_contour = cv2.cvtColor(hsv_contour, cv2.COLOR_HSV2BGR)
     
     # Apply the contour adjustment
     result = cv2.bitwise_and(result, result, mask=cv2.bitwise_not(contour_mask))
     result = cv2.add(result, darkened_contour)
     
+    # Apply a slight nose tip refinement using warping
+    h, w = image.shape[:2]
+    
+    # Create a grid of points
+    x = np.linspace(0, w-1, w)
+    y = np.linspace(0, h-1, h)
+    xx, yy = np.meshgrid(x, y)
+    
+    # Create a displacement map for the nose tip
+    displacement = np.zeros((h, w, 2), dtype=np.float32)
+    
+    # Calculate the center of the nose tip
+    center_x = np.mean(nose_tip_points[:, 0])
+    center_y = np.mean(nose_tip_points[:, 1])
+    
+    # Apply a vertical displacement to refine the nose tip
+    for i in range(h):
+        for j in range(w):
+            # Calculate the distance from the center of the nose tip
+            dist = np.sqrt((j - center_x)**2 + (i - center_y)**2)
+            
+            # Apply a displacement based on the distance
+            if dist < 30 * intensity:  # Adjust the radius based on intensity
+                # Calculate the displacement factor
+                factor = 1 - (dist / (30 * intensity))
+                
+                # Apply a vertical displacement to refine the nose tip
+                displacement[i, j, 1] = -5 * factor * intensity  # Adjust the magnitude based on intensity
+    
+    # Apply the displacement map
+    result = cv2.remap(result, xx.astype(np.float32), yy.astype(np.float32) + displacement[:, :, 1], cv2.INTER_LINEAR)
+    
     return result
 
-def apply_nose_narrowing(image, mask, nose_bridge_points, nose_tip_points):
+def apply_nose_narrowing(image, mask, nose_bridge_points, nose_tip_points, nose_side_left_points, nose_side_right_points, intensity=0.8):
     # Create a copy of the image
     result = image.copy()
     
@@ -285,7 +403,7 @@ def apply_nose_narrowing(image, mask, nose_bridge_points, nose_tip_points):
     
     # Apply a slight brightness increase to the nose region
     hsv = cv2.cvtColor(blurred_nose, cv2.COLOR_BGR2HSV)
-    hsv[:, :, 2] = hsv[:, :, 2] * 1.1  # Increase brightness by 10%
+    hsv[:, :, 2] = hsv[:, :, 2] * (1 + 0.1 * intensity)  # Increase brightness by 10% * intensity
     brightened_nose = cv2.cvtColor(hsv, cv2.COLOR_HSV2BGR)
     
     # Apply the modified nose region back to the image
@@ -300,16 +418,51 @@ def apply_nose_narrowing(image, mask, nose_bridge_points, nose_tip_points):
     # Apply a slight darkening to the contour to create definition
     contour_region = cv2.bitwise_and(result, result, mask=contour_mask)
     hsv_contour = cv2.cvtColor(contour_region, cv2.COLOR_BGR2HSV)
-    hsv_contour[:, :, 2] = hsv_contour[:, :, 2] * 0.9  # Decrease brightness by 10%
+    hsv_contour[:, :, 2] = hsv_contour[:, :, 2] * (1 - 0.1 * intensity)  # Decrease brightness by 10% * intensity
     darkened_contour = cv2.cvtColor(hsv_contour, cv2.COLOR_HSV2BGR)
     
     # Apply the contour adjustment
     result = cv2.bitwise_and(result, result, mask=cv2.bitwise_not(contour_mask))
     result = cv2.add(result, darkened_contour)
     
+    # Apply a slight nose narrowing using warping
+    h, w = image.shape[:2]
+    
+    # Create a grid of points
+    x = np.linspace(0, w-1, w)
+    y = np.linspace(0, h-1, h)
+    xx, yy = np.meshgrid(x, y)
+    
+    # Create a displacement map for the nose narrowing
+    displacement = np.zeros((h, w, 2), dtype=np.float32)
+    
+    # Calculate the center of the nose
+    center_x = np.mean(nose_bridge_points[:, 0])
+    center_y = np.mean(nose_bridge_points[:, 1])
+    
+    # Apply a horizontal displacement to narrow the nose
+    for i in range(h):
+        for j in range(w):
+            # Calculate the distance from the center of the nose
+            dist = np.sqrt((j - center_x)**2 + (i - center_y)**2)
+            
+            # Apply a displacement based on the distance
+            if dist < 40 * intensity:  # Adjust the radius based on intensity
+                # Calculate the displacement factor
+                factor = 1 - (dist / (40 * intensity))
+                
+                # Apply a horizontal displacement to narrow the nose
+                if j < center_x:
+                    displacement[i, j, 0] = 5 * factor * intensity  # Adjust the magnitude based on intensity
+                else:
+                    displacement[i, j, 0] = -5 * factor * intensity  # Adjust the magnitude based on intensity
+    
+    # Apply the displacement map
+    result = cv2.remap(result, xx.astype(np.float32) + displacement[:, :, 0], yy.astype(np.float32), cv2.INTER_LINEAR)
+    
     return result
 
-def apply_crooked_correction(image, mask, nose_bridge_points):
+def apply_crooked_correction(image, mask, nose_bridge_points, intensity=0.7):
     # Create a copy of the image
     result = image.copy()
     
@@ -323,7 +476,7 @@ def apply_crooked_correction(image, mask, nose_bridge_points):
     
     # Apply a slight brightness increase to the nose bridge region
     hsv = cv2.cvtColor(blurred_bridge, cv2.COLOR_BGR2HSV)
-    hsv[:, :, 2] = hsv[:, :, 2] * 1.1  # Increase brightness by 10%
+    hsv[:, :, 2] = hsv[:, :, 2] * (1 + 0.1 * intensity)  # Increase brightness by 10% * intensity
     brightened_bridge = cv2.cvtColor(hsv, cv2.COLOR_HSV2BGR)
     
     # Apply the modified nose bridge region back to the image
@@ -338,20 +491,78 @@ def apply_crooked_correction(image, mask, nose_bridge_points):
     # Apply a slight darkening to the contour to create definition
     contour_region = cv2.bitwise_and(result, result, mask=contour_mask)
     hsv_contour = cv2.cvtColor(contour_region, cv2.COLOR_BGR2HSV)
-    hsv_contour[:, :, 2] = hsv_contour[:, :, 2] * 0.9  # Decrease brightness by 10%
+    hsv_contour[:, :, 2] = hsv_contour[:, :, 2] * (1 - 0.1 * intensity)  # Decrease brightness by 10% * intensity
     darkened_contour = cv2.cvtColor(hsv_contour, cv2.COLOR_HSV2BGR)
     
     # Apply the contour adjustment
     result = cv2.bitwise_and(result, result, mask=cv2.bitwise_not(contour_mask))
     result = cv2.add(result, darkened_contour)
     
+    # Apply a slight crooked nose correction using warping
+    h, w = image.shape[:2]
+    
+    # Create a grid of points
+    x = np.linspace(0, w-1, w)
+    y = np.linspace(0, h-1, h)
+    xx, yy = np.meshgrid(x, y)
+    
+    # Create a displacement map for the crooked nose correction
+    displacement = np.zeros((h, w, 2), dtype=np.float32)
+    
+    # Calculate the center of the nose bridge
+    center_x = np.mean(nose_bridge_points[:, 0])
+    center_y = np.mean(nose_bridge_points[:, 1])
+    
+    # Calculate the angle of the nose bridge
+    angle = np.arctan2(nose_bridge_points[-1, 1] - nose_bridge_points[0, 1], nose_bridge_points[-1, 0] - nose_bridge_points[0, 0])
+    
+    # Apply a displacement to straighten the nose bridge
+    for i in range(h):
+        for j in range(w):
+            # Calculate the distance from the center of the nose bridge
+            dist = np.sqrt((j - center_x)**2 + (i - center_y)**2)
+            
+            # Apply a displacement based on the distance
+            if dist < 50 * intensity:  # Adjust the radius based on intensity
+                # Calculate the displacement factor
+                factor = 1 - (dist / (50 * intensity))
+                
+                # Apply a displacement to straighten the nose bridge
+                displacement[i, j, 0] = -5 * factor * intensity * np.sin(angle)  # Adjust the magnitude based on intensity
+                displacement[i, j, 1] = 5 * factor * intensity * np.cos(angle)  # Adjust the magnitude based on intensity
+    
+    # Apply the displacement map
+    result = cv2.remap(result, xx.astype(np.float32) + displacement[:, :, 0], yy.astype(np.float32) + displacement[:, :, 1], cv2.INTER_LINEAR)
+    
     return result
 
-def apply_combined_enhancement(image, mask, nose_bridge_points, nose_tip_points):
+def apply_combined_enhancement(image, mask, nose_bridge_points, nose_tip_points, nose_side_left_points, nose_side_right_points, intensity=0.6):
     # Apply multiple refinements
-    result = apply_natural_refinement(image, mask, nose_bridge_points, nose_tip_points)
-    result = apply_bridge_reduction(result, mask, nose_bridge_points)
-    result = apply_tip_refinement(result, mask, nose_tip_points)
+    result = apply_natural_refinement(image, mask, nose_bridge_points, nose_tip_points, intensity * 0.8)
+    result = apply_bridge_reduction(result, mask, nose_bridge_points, intensity * 0.7)
+    result = apply_tip_refinement(result, mask, nose_tip_points, intensity * 0.9)
+    result = apply_nose_narrowing(result, mask, nose_bridge_points, nose_tip_points, nose_side_left_points, nose_side_right_points, intensity * 0.6)
+    return result
+
+def apply_final_touches(image, mask):
+    # Create a copy of the image
+    result = image.copy()
+    
+    # Apply a slight blur to the entire image to smooth out any artifacts
+    result = cv2.GaussianBlur(result, (3, 3), 0)
+    
+    # Apply a slight sharpening to enhance details
+    kernel = np.array([[-1, -1, -1], [-1, 9, -1], [-1, -1, -1]])
+    result = cv2.filter2D(result, -1, kernel)
+    
+    # Apply a slight color correction to match the skin tone
+    hsv = cv2.cvtColor(result, cv2.COLOR_BGR2HSV)
+    hsv[:, :, 1] = hsv[:, :, 1] * 0.95  # Decrease saturation by 5%
+    result = cv2.cvtColor(hsv, cv2.COLOR_HSV2BGR)
+    
+    # Apply a slight noise reduction
+    result = cv2.fastNlMeansDenoisingColored(result, None, 10, 10, 7, 21)
+    
     return result
 
 def main():
@@ -400,6 +611,16 @@ def main():
                 <p style='color: #2c3e50;'>{RHINOPLASTY_OPTIONS[option]['description']}</p>
             </div>
         """, unsafe_allow_html=True)
+        
+        # Add intensity slider
+        intensity = st.slider(
+            "Adjust the intensity of the effect",
+            min_value=0.0,
+            max_value=1.0,
+            value=RHINOPLASTY_OPTIONS[option]["intensity"],
+            step=0.1,
+            format="%.1f"
+        )
 
     if uploaded_file is not None:
         try:
