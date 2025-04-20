@@ -328,6 +328,7 @@
         let canvas = null;
         let ctx = null;
         let faceMorph = null;
+        let faceMorphInitialized = false;
         
         // Get the token from the global variable
         const clientToken = window.BANUBA_CLIENT_TOKEN;
@@ -341,12 +342,23 @@
             ctx = canvas.getContext('2d');
             
             try {
+                // Check if FaceMorph is available
+                if (typeof FaceMorph === 'undefined') {
+                    console.error('FaceMorph library not loaded');
+                    return;
+                }
+                
                 // Initialize FaceMorph using the existing Banuba token
-                faceMorph = await FaceMorph.init({
-                    apiKey: window.BANUBA_CLIENT_TOKEN,
-                    container: canvas
-                });
-                console.log('FaceMorph initialized successfully with Banuba token');
+                if (clientToken) {
+                    faceMorph = await FaceMorph.init({
+                        apiKey: clientToken,
+                        container: canvas
+                    });
+                    faceMorphInitialized = true;
+                    console.log('FaceMorph initialized successfully with Banuba token');
+                } else {
+                    console.error('Banuba client token not available');
+                }
             } catch (error) {
                 console.error('Failed to initialize FaceMorph:', error);
             }
@@ -396,14 +408,16 @@
                         // Store the original image data
                         originalImage = canvas.toDataURL('image/png');
                         
-                        // Initialize face detection
-                        if (faceMorph) {
+                        // Initialize face detection if FaceMorph is available
+                        if (faceMorphInitialized && faceMorph) {
                             try {
                                 await faceMorph.detectFaces(canvas);
                                 console.log('Face detection completed');
                             } catch (error) {
                                 console.error('Face detection failed:', error);
                             }
+                        } else {
+                            console.warn('FaceMorph not initialized, skipping face detection');
                         }
                         
                         // Display the image in the result container
@@ -475,8 +489,8 @@
                     throw new Error('No image available to process');
                 }
                 
-                if (!faceMorph) {
-                    throw new Error('FaceMorph not initialized');
+                if (!faceMorphInitialized || !faceMorph) {
+                    throw new Error('FaceMorph not initialized. Please try refreshing the page.');
                 }
                 
                 // Create an image element to load the image data
@@ -508,8 +522,8 @@
 
         // AI-based rhinoplasty simulation
         async function applyAIRhinoplasty(ctx, effectType) {
-            if (!faceMorph) {
-                throw new Error('FaceMorph not initialized');
+            if (!faceMorphInitialized || !faceMorph) {
+                throw new Error('FaceMorph not initialized. Please try refreshing the page.');
             }
             
             try {
@@ -643,7 +657,7 @@
                 // Reset to original image
                 if (originalImage) {
                     // Clear all FaceMorph effects
-                    if (faceMorph) {
+                    if (faceMorphInitialized && faceMorph) {
                         await faceMorph.clear();
                     }
                     
