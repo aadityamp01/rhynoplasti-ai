@@ -3,56 +3,17 @@ import numpy as np
 from PIL import Image
 import io
 import os
-import json
 import tempfile
 
 try:
     import cv2
     import mediapipe as mp
-    from google.cloud import aiplatform
-    from vertexai.preview.generative_models import GenerativeModel, Image as VertexImage
+    from diffusers import StableDiffusionInpaintPipeline
+    import torch
     OPENCV_AVAILABLE = True
 except ImportError as e:
     st.error(f"Error importing required libraries: {str(e)}")
     OPENCV_AVAILABLE = False
-
-# Function to set up Google Cloud credentials from Streamlit secrets
-def setup_google_credentials():
-    try:
-        # Check if credentials are in Streamlit secrets
-        if 'google_credentials' in st.secrets:
-            # Handle different types of secrets objects
-            if hasattr(st.secrets['google_credentials'], '__dict__'):
-                # AttrDict object (from TOML)
-                credentials = dict(st.secrets['google_credentials'])
-            elif isinstance(st.secrets['google_credentials'], dict):
-                # Dictionary
-                credentials = st.secrets['google_credentials']
-            else:
-                # String (JSON)
-                credentials = json.loads(st.secrets['google_credentials'])
-            
-            # Create a temporary file to store the credentials
-            with tempfile.NamedTemporaryFile(mode='w', delete=False, suffix='.json') as temp_file:
-                json.dump(credentials, temp_file)
-                temp_file_path = temp_file.name
-            
-            # Set the environment variable
-            os.environ['GOOGLE_APPLICATION_CREDENTIALS'] = temp_file_path
-            
-            # Set project ID if available
-            if 'google_cloud_project' in st.secrets and hasattr(st.secrets['google_cloud_project'], 'project_id'):
-                os.environ['GOOGLE_CLOUD_PROJECT'] = st.secrets['google_cloud_project'].project_id
-            elif 'project_id' in credentials:
-                os.environ['GOOGLE_CLOUD_PROJECT'] = credentials['project_id']
-                
-            return True
-        else:
-            st.error("Google Cloud credentials not found in Streamlit secrets.")
-            return False
-    except Exception as e:
-        st.error(f"Error setting up Google Cloud credentials: {str(e)}")
-        return False
 
 def detect_nose_landmarks(image):
     if not OPENCV_AVAILABLE:
@@ -96,34 +57,36 @@ def detect_nose_landmarks(image):
 
 def generate_rhinoplasty_image(image, mask):
     try:
-        # Initialize Vertex AI
-        aiplatform.init(project=os.getenv('GOOGLE_CLOUD_PROJECT'))
+        # Convert image to PIL format
+        image_pil = Image.fromarray(cv2.cvtColor(image, cv2.COLOR_BGR2RGB))
+        mask_pil = Image.fromarray(mask)
         
-        # Convert image to Vertex AI format
-        image_bytes = cv2.imencode('.jpg', image)[1].tobytes()
-        vertex_image = VertexImage.from_bytes(image_bytes)
-        
-        # Create the prompt
-        prompt = """
-        Perform a subtle rhinoplasty refinement on the masked area of the face.
-        Maintain natural-looking results while improving the nose shape and profile.
-        Keep the rest of the face unchanged.
-        """
-        
-        # Generate the image
-        model = GenerativeModel("imagegeneration@002")
-        response = model.generate_content(
-            [prompt, vertex_image],
-            generation_config={
-                "temperature": 0.4,
-                "top_p": 0.8,
-                "top_k": 40
-            }
+        # Load the Stable Diffusion model
+        pipe = StableDiffusionInpaintPipeline.from_pretrained(
+            "runwayml/stable-diffusion-inpainting",
+            torch_dtype=torch.float16 if torch.cuda.is_available() else torch.float32
         )
         
-        # Convert response to PIL Image
-        generated_image = Image.open(io.BytesIO(response.image))
-        return generated_image
+        # Move to GPU if available
+        if torch.cuda.is_available():
+            pipe = pipe.to("cuda")
+        
+        # Create the prompt
+        prompt = "a natural-looking nose after rhinoplasty, subtle refinement, realistic, high quality, detailed"
+        negative_prompt = "deformed, ugly, unrealistic, cartoon, anime, illustration, painting, drawing"
+        
+        # Generate the image
+        with st.spinner("Generating rhinoplasty result..."):
+            result = pipe(
+                prompt=prompt,
+                negative_prompt=negative_prompt,
+                image=image_pil,
+                mask_image=mask_pil,
+                num_inference_steps=30,
+                guidance_scale=7.5
+            ).images[0]
+        
+        return result
     except Exception as e:
         st.error(f"Error in image generation: {str(e)}")
         return None
@@ -134,11 +97,6 @@ def main():
     
     if not OPENCV_AVAILABLE:
         st.error("Required libraries are not available. Please check the installation.")
-        return
-    
-    # Set up Google Cloud credentials
-    if not setup_google_credentials():
-        st.error("Failed to set up Google Cloud credentials. Please check your Streamlit secrets.")
         return
     
     # File uploader
@@ -161,13 +119,12 @@ def main():
                 st.image(mask, caption="Nose Region Mask")
                 
                 if st.button("Generate Rhinoplasty Result"):
-                    with st.spinner("Generating result..."):
-                        # Generate the rhinoplasty image
-                        result_image = generate_rhinoplasty_image(image, mask)
-                        
-                        if result_image:
-                            # Display result
-                            st.image(result_image, caption="After Rhinoplasty")
+                    # Generate the rhinoplasty image
+                    result_image = generate_rhinoplasty_image(image, mask)
+                    
+                    if result_image:
+                        # Display result
+                        st.image(result_image, caption="After Rhinoplasty")
             else:
                 st.error("No face detected in the image. Please try another photo.")
         except Exception as e:

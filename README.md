@@ -1,20 +1,10 @@
 # AI Rhinoplasty Simulator
 
-This Streamlit application uses Google Cloud's Vertex AI and MediaPipe to simulate rhinoplasty results on uploaded facial images.
+This Streamlit application uses Hugging Face's Stable Diffusion and MediaPipe to simulate rhinoplasty results on uploaded facial images.
 
 ## Setup Instructions
 
-1. **Google Cloud Setup**
-   - Create a new Google Cloud project
-   - Enable the Vertex AI API
-   - Create a service account and download the JSON key file
-   - Set the following environment variables:
-     ```
-     GOOGLE_APPLICATION_CREDENTIALS=path/to/your/service-account-key.json
-     GOOGLE_CLOUD_PROJECT=your-project-id
-     ```
-
-2. **Local Environment Setup**
+1. **Local Environment Setup**
    ```bash
    # Create a virtual environment
    python -m venv venv
@@ -24,16 +14,16 @@ This Streamlit application uses Google Cloud's Vertex AI and MediaPipe to simula
    pip install -r requirements.txt
    ```
 
-3. **Running the App**
+2. **Running the App**
    ```bash
-   streamlit run app.py
+   streamlit run src/app.py
    ```
 
 ## Features
 
 - Upload facial images
-- Automatic nose region detection
-- AI-powered rhinoplasty simulation
+- Automatic nose region detection using MediaPipe
+- AI-powered rhinoplasty simulation using Stable Diffusion
 - Real-time preview of results
 
 ## Deployment
@@ -42,15 +32,21 @@ To deploy on Streamlit Community Cloud:
 
 1. Push your code to GitHub
 2. Connect your GitHub repository to Streamlit Cloud
-3. Add your Google Cloud credentials as secrets in the Streamlit Cloud dashboard
-4. Deploy!
+3. Deploy!
 
 ## Requirements
 
 - Python 3.8+
-- Google Cloud account with Vertex AI enabled
 - All dependencies listed in requirements.txt
 
-## Security Note
+## How It Works
 
-Never commit your Google Cloud service account key to version control. Always use environment variables or secrets management for sensitive credentials. 
+1. The app uses MediaPipe Face Mesh to detect facial landmarks
+2. It creates a mask around the nose area
+3. Stable Diffusion inpainting is used to generate a realistic rhinoplasty result
+4. The result is displayed alongside the original image
+
+## Notes
+
+- The first run may take longer as it downloads the Stable Diffusion model
+- For better performance, a GPU is recommended but not required 
