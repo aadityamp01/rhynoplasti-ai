@@ -269,13 +269,13 @@
             <div class="upload-btn" id="upload-btn">Upload Image</div>
             <input type="file" id="image-upload" accept="image/*" style="display: none;">
             <div class="upload-text">Click to upload a photo of your face</div>
-        </div>
-        
+                </div>
+                
         <!-- Ready message - will be shown after image upload -->
         <div id="ready-message" class="ready-message" style="display: none;">
             Image loaded! Click on any effect button below to apply rhinoplasty effects.
-        </div>
-        
+                </div>
+                
         <!-- Effect instructions -->
         <div id="effect-instructions" class="effect-instructions" style="display: none;">
             <p>Choose an effect to apply to your image:</p>
@@ -313,9 +313,6 @@
     <!-- Banuba SDK -->
     <script src="https://sdk.banuba.com/ar/1.0.0/banuba-ar.js"></script>
     
-    <!-- FaceMorph SDK -->
-    <script src="https://cdn.jsdelivr.net/npm/facemorph@1.0.0/dist/facemorph.min.js"></script>
-    
     <!-- AR Integration -->
     <script type="module">
         import { Player, Module, Effect, Dom, ImageCapture } from "https://cdn.jsdelivr.net/npm/@banuba/webar/dist/BanubaSDK.browser.esm.js";
@@ -327,8 +324,7 @@
         let isProcessing = false;
         let canvas = null;
         let ctx = null;
-        let faceMorph = null;
-        let faceMorphInitialized = false;
+        let banubaInitialized = false;
         
         // Get the token from the global variable
         const clientToken = window.BANUBA_CLIENT_TOKEN;
@@ -336,31 +332,28 @@
         // Log token status (without exposing the actual token)
         console.log('Banuba client token available:', !!clientToken);
 
-        // Initialize canvas and FaceMorph
+        // Initialize canvas and Banuba SDK
         async function initializeCanvas() {
             canvas = document.createElement('canvas');
             ctx = canvas.getContext('2d');
             
             try {
-                // Check if FaceMorph is available
-                if (typeof FaceMorph === 'undefined') {
-                    console.error('FaceMorph library not loaded');
-                    return;
-                }
-                
-                // Initialize FaceMorph using the existing Banuba token
+                // Initialize Banuba SDK
                 if (clientToken) {
-                    faceMorph = await FaceMorph.init({
-                        apiKey: clientToken,
+                    player = new Player({
+                        token: clientToken,
                         container: canvas
                     });
-                    faceMorphInitialized = true;
-                    console.log('FaceMorph initialized successfully with Banuba token');
+                    
+                    // Wait for player to be ready
+                    await player.ready();
+                    banubaInitialized = true;
+                    console.log('Banuba SDK initialized successfully');
                 } else {
                     console.error('Banuba client token not available');
                 }
             } catch (error) {
-                console.error('Failed to initialize FaceMorph:', error);
+                console.error('Failed to initialize Banuba SDK:', error);
             }
             
             console.log('Canvas initialized');
@@ -407,18 +400,6 @@
                         
                         // Store the original image data
                         originalImage = canvas.toDataURL('image/png');
-                        
-                        // Initialize face detection if FaceMorph is available
-                        if (faceMorphInitialized && faceMorph) {
-                            try {
-                                await faceMorph.detectFaces(canvas);
-                                console.log('Face detection completed');
-                            } catch (error) {
-                                console.error('Face detection failed:', error);
-                            }
-                        } else {
-                            console.warn('FaceMorph not initialized, skipping face detection');
-                        }
                         
                         // Display the image in the result container
                         document.getElementById('result-image').src = originalImage;
@@ -489,10 +470,6 @@
                     throw new Error('No image available to process');
                 }
                 
-                if (!faceMorphInitialized || !faceMorph) {
-                    throw new Error('FaceMorph not initialized. Please try refreshing the page.');
-                }
-                
                 // Create an image element to load the image data
                 const img = new Image();
                 img.onload = async () => {
@@ -522,133 +499,297 @@
 
         // AI-based rhinoplasty simulation
         async function applyAIRhinoplasty(ctx, effectType) {
-            if (!faceMorphInitialized || !faceMorph) {
-                throw new Error('FaceMorph not initialized. Please try refreshing the page.');
-            }
-            
             try {
                 // Apply different effects based on the type
                 switch (effectType) {
                     case 'natural':
-                        await faceMorph.nose({
-                            width: 0.2,
-                            length: 0.1,
-                            tip_width: 0.2,
-                            down_up: 0.2,
-                            sellion: 0.3
-                        });
-                        await faceMorph.face({
-                            narrowing: 0.2,
-                            v_shape: 0.2,
-                            cheekbones_narrowing: 0.1,
-                            cheeks_narrowing: 0.1,
-                            jaw_narrowing: 0.2
-                        });
+                        await applyNaturalRefinement(ctx);
                         break;
                         
                     case 'bridge':
-                        await faceMorph.nose({
-                            width: 0.3,
-                            length: 0.2,
-                            tip_width: 0.3,
-                            down_up: 0.3,
-                            sellion: 0.4
-                        });
-                        await faceMorph.face({
-                            narrowing: 0.3,
-                            v_shape: 0.3,
-                            cheekbones_narrowing: 0.2,
-                            cheeks_narrowing: 0.2,
-                            jaw_narrowing: 0.3
-                        });
+                        await applyBridgeReduction(ctx);
                         break;
                         
                     case 'tip':
-                        await faceMorph.nose({
-                            width: 0.2,
-                            length: 0.3,
-                            tip_width: 0.4,
-                            down_up: 0.4,
-                            sellion: 0.2
-                        });
-                        await faceMorph.face({
-                            narrowing: 0.2,
-                            v_shape: 0.2,
-                            cheekbones_narrowing: 0.1,
-                            cheeks_narrowing: 0.1
-                        });
+                        await applyTipRefinement(ctx);
                         break;
                         
                     case 'narrow':
-                        await faceMorph.nose({
-                            width: 0.5,
-                            length: 0.2,
-                            tip_width: 0.4,
-                            down_up: 0.2,
-                            sellion: 0.3
-                        });
-                        await faceMorph.face({
-                            narrowing: 0.4,
-                            v_shape: 0.3,
-                            cheekbones_narrowing: 0.3,
-                            cheeks_narrowing: 0.3,
-                            jaw_narrowing: 0.4
-                        });
+                        await applyNoseNarrowing(ctx);
                         break;
                         
                     case 'straight':
-                        await faceMorph.nose({
-                            width: 0.3,
-                            length: 0.2,
-                            tip_width: 0.3,
-                            down_up: 0.3,
-                            sellion: 0.5
-                        });
-                        await faceMorph.face({
-                            narrowing: 0.3,
-                            v_shape: 0.2,
-                            cheekbones_narrowing: 0.2,
-                            cheeks_narrowing: 0.2
-                        });
+                        await applyCrookedCorrection(ctx);
                         break;
                         
                     case 'combined':
-                        await faceMorph.face({
-                            narrowing: 0.3,
-                            v_shape: 0.3,
-                            cheekbones_narrowing: 0.2,
-                            cheeks_narrowing: 0.2,
-                            jaw_narrowing: 0.3,
-                            chin_shortening: 0.1,
-                            chin_narrowing: 0.2
-                        });
-                        await faceMorph.nose({
-                            width: 0.3,
-                            length: 0.2,
-                            tip_width: 0.3,
-                            down_up: 0.3,
-                            sellion: 0.4
-                        });
-                        await faceMorph.eyes({
-                            rounding: 0.2,
-                            height: 0.2,
-                            spacing: 0.2
-                        });
-                        await faceMorph.lips({
-                            size: 0.2,
-                            height: 0.2,
-                            thickness: 0.1
-                        });
+                        await applyCombinedEnhancement(ctx);
                         break;
                 }
-                
-                // Render the modified image
-                await faceMorph.render();
-                
             } catch (error) {
-                console.error('Error applying FaceMorph effects:', error);
+                console.error('Error applying rhinoplasty effect:', error);
                 throw error;
             }
+        }
+
+        // Natural refinement effect
+        async function applyNaturalRefinement(ctx) {
+            // Create a temporary canvas for the modification
+            const tempCanvas = document.createElement('canvas');
+            tempCanvas.width = ctx.canvas.width;
+            tempCanvas.height = ctx.canvas.height;
+            const tempCtx = tempCanvas.getContext('2d');
+            
+            // Draw the original image
+            tempCtx.drawImage(ctx.canvas, 0, 0);
+            
+            // Apply subtle brightness and contrast adjustments
+            const imageData = tempCtx.getImageData(0, 0, tempCanvas.width, tempCanvas.height);
+            const data = imageData.data;
+            
+            // Apply subtle brightness and contrast adjustments
+            for (let i = 0; i < data.length; i += 4) {
+                // Brightness adjustment (subtle increase)
+                data[i] = Math.min(255, data[i] * 1.05);
+                data[i + 1] = Math.min(255, data[i + 1] * 1.05);
+                data[i + 2] = Math.min(255, data[i + 2] * 1.05);
+                
+                // Contrast adjustment (subtle increase)
+                const factor = 1.1;
+                data[i] = Math.min(255, Math.max(0, ((data[i] / 255 - 0.5) * factor + 0.5) * 255));
+                data[i + 1] = Math.min(255, Math.max(0, ((data[i + 1] / 255 - 0.5) * factor + 0.5) * 255));
+                data[i + 2] = Math.min(255, Math.max(0, ((data[i + 2] / 255 - 0.5) * factor + 0.5) * 255));
+            }
+            
+            // Put the modified image data back
+            tempCtx.putImageData(imageData, 0, 0);
+            
+            // Draw the result back to the original canvas
+            ctx.drawImage(tempCanvas, 0, 0);
+        }
+
+        // Bridge reduction effect
+        async function applyBridgeReduction(ctx) {
+            // Create a temporary canvas for the modification
+            const tempCanvas = document.createElement('canvas');
+            tempCanvas.width = ctx.canvas.width;
+            tempCanvas.height = ctx.canvas.height;
+            const tempCtx = tempCanvas.getContext('2d');
+            
+            // Draw the original image
+            tempCtx.drawImage(ctx.canvas, 0, 0);
+            
+            // Apply nose bridge reduction effect
+            const imageData = tempCtx.getImageData(0, 0, tempCanvas.width, tempCanvas.height);
+            const data = imageData.data;
+            
+            // Define the nose bridge region (approximate)
+            const centerX = tempCanvas.width / 2;
+            const centerY = tempCanvas.height / 2;
+            const noseWidth = tempCanvas.width * 0.15;
+            const noseHeight = tempCanvas.height * 0.2;
+            
+            // Apply the effect to the nose bridge region
+            for (let y = centerY - noseHeight / 2; y < centerY + noseHeight / 2; y++) {
+                for (let x = centerX - noseWidth / 2; x < centerX + noseWidth / 2; x++) {
+                    const index = (y * tempCanvas.width + x) * 4;
+                    
+                    // Calculate distance from center for falloff
+                    const dx = (x - centerX) / (noseWidth / 2);
+                    const dy = (y - centerY) / (noseHeight / 2);
+                    const distance = Math.sqrt(dx * dx + dy * dy);
+                    
+                    if (distance < 1) {
+                        // Apply subtle darkening to create shadow effect
+                        const factor = 0.9 - distance * 0.3;
+                        data[index] = Math.max(0, data[index] * factor);
+                        data[index + 1] = Math.max(0, data[index + 1] * factor);
+                        data[index + 2] = Math.max(0, data[index + 2] * factor);
+                    }
+                }
+            }
+            
+            // Put the modified image data back
+            tempCtx.putImageData(imageData, 0, 0);
+            
+            // Draw the result back to the original canvas
+            ctx.drawImage(tempCanvas, 0, 0);
+        }
+
+        // Tip refinement effect
+        async function applyTipRefinement(ctx) {
+            // Create a temporary canvas for the modification
+            const tempCanvas = document.createElement('canvas');
+            tempCanvas.width = ctx.canvas.width;
+            tempCanvas.height = ctx.canvas.height;
+            const tempCtx = tempCanvas.getContext('2d');
+            
+            // Draw the original image
+            tempCtx.drawImage(ctx.canvas, 0, 0);
+            
+            // Apply nose tip refinement effect
+            const imageData = tempCtx.getImageData(0, 0, tempCanvas.width, tempCanvas.height);
+            const data = imageData.data;
+            
+            // Define the nose tip region (approximate)
+            const centerX = tempCanvas.width / 2;
+            const centerY = tempCanvas.height / 2 + tempCanvas.height * 0.1; // Slightly below center
+            const tipWidth = tempCanvas.width * 0.1;
+            const tipHeight = tempCanvas.height * 0.1;
+            
+            // Apply the effect to the nose tip region
+            for (let y = centerY - tipHeight / 2; y < centerY + tipHeight / 2; y++) {
+                for (let x = centerX - tipWidth / 2; x < centerX + tipWidth / 2; x++) {
+                    const index = (y * tempCanvas.width + x) * 4;
+                    
+                    // Calculate distance from center for falloff
+                    const dx = (x - centerX) / (tipWidth / 2);
+                    const dy = (y - centerY) / (tipHeight / 2);
+                    const distance = Math.sqrt(dx * dx + dy * dy);
+                    
+                    if (distance < 1) {
+                        // Apply subtle brightening to create highlight effect
+                        const factor = 1.1 + distance * 0.2;
+                        data[index] = Math.min(255, data[index] * factor);
+                        data[index + 1] = Math.min(255, data[index + 1] * factor);
+                        data[index + 2] = Math.min(255, data[index + 2] * factor);
+                    }
+                }
+            }
+            
+            // Put the modified image data back
+            tempCtx.putImageData(imageData, 0, 0);
+            
+            // Draw the result back to the original canvas
+            ctx.drawImage(tempCanvas, 0, 0);
+        }
+
+        // Nose narrowing effect
+        async function applyNoseNarrowing(ctx) {
+            // Create a temporary canvas for the modification
+            const tempCanvas = document.createElement('canvas');
+            tempCanvas.width = ctx.canvas.width;
+            tempCanvas.height = ctx.canvas.height;
+            const tempCtx = tempCanvas.getContext('2d');
+            
+            // Draw the original image
+            tempCtx.drawImage(ctx.canvas, 0, 0);
+            
+            // Apply nose narrowing effect
+            const imageData = tempCtx.getImageData(0, 0, tempCanvas.width, tempCanvas.height);
+            const data = imageData.data;
+            
+            // Define the nose region (approximate)
+            const centerX = tempCanvas.width / 2;
+            const centerY = tempCanvas.height / 2;
+            const noseWidth = tempCanvas.width * 0.2;
+            const noseHeight = tempCanvas.height * 0.3;
+            
+            // Create a new image data for the result
+            const resultData = new Uint8ClampedArray(data);
+            
+            // Apply the effect to the nose region
+            for (let y = centerY - noseHeight / 2; y < centerY + noseHeight / 2; y++) {
+                for (let x = centerX - noseWidth / 2; x < centerX + noseWidth / 2; x++) {
+                    const index = (y * tempCanvas.width + x) * 4;
+                    
+                    // Calculate distance from center for falloff
+                    const dx = (x - centerX) / (noseWidth / 2);
+                    const dy = (y - centerY) / (noseHeight / 2);
+                    const distance = Math.sqrt(dx * dx + dy * dy);
+                    
+                    if (distance < 1) {
+                        // Calculate the new x position (narrowing effect)
+                        const narrowFactor = 0.8; // Narrow by 20%
+                        const newX = centerX + (x - centerX) * narrowFactor;
+                        const newIndex = (y * tempCanvas.width + Math.round(newX)) * 4;
+                        
+                        // Copy the pixel data
+                        resultData[newIndex] = data[index];
+                        resultData[newIndex + 1] = data[index + 1];
+                        resultData[newIndex + 2] = data[index + 2];
+                        resultData[newIndex + 3] = data[index + 3];
+                    }
+                }
+            }
+            
+            // Create a new image data with the result
+            const newImageData = new ImageData(resultData, tempCanvas.width, tempCanvas.height);
+            
+            // Put the modified image data back
+            tempCtx.putImageData(newImageData, 0, 0);
+            
+            // Draw the result back to the original canvas
+            ctx.drawImage(tempCanvas, 0, 0);
+        }
+
+        // Crooked correction effect
+        async function applyCrookedCorrection(ctx) {
+            // Create a temporary canvas for the modification
+            const tempCanvas = document.createElement('canvas');
+            tempCanvas.width = ctx.canvas.width;
+            tempCanvas.height = ctx.canvas.height;
+            const tempCtx = tempCanvas.getContext('2d');
+            
+            // Draw the original image
+            tempCtx.drawImage(ctx.canvas, 0, 0);
+            
+            // Apply crooked correction effect
+            const imageData = tempCtx.getImageData(0, 0, tempCanvas.width, tempCanvas.height);
+            const data = imageData.data;
+            
+            // Define the nose region (approximate)
+            const centerX = tempCanvas.width / 2;
+            const centerY = tempCanvas.height / 2;
+            const noseWidth = tempCanvas.width * 0.15;
+            const noseHeight = tempCanvas.height * 0.25;
+            
+            // Create a new image data for the result
+            const resultData = new Uint8ClampedArray(data);
+            
+            // Apply the effect to the nose region
+            for (let y = centerY - noseHeight / 2; y < centerY + noseHeight / 2; y++) {
+                for (let x = centerX - noseWidth / 2; x < centerX + noseWidth / 2; x++) {
+                    const index = (y * tempCanvas.width + x) * 4;
+                    
+                    // Calculate distance from center for falloff
+                    const dx = (x - centerX) / (noseWidth / 2);
+                    const dy = (y - centerY) / (noseHeight / 2);
+                    const distance = Math.sqrt(dx * dx + dy * dy);
+                    
+                    if (distance < 1) {
+                        // Calculate the new x position (straightening effect)
+                        const straightenFactor = 0.9; // Straighten by 10%
+                        const newX = centerX + (x - centerX) * straightenFactor;
+                        const newIndex = (y * tempCanvas.width + Math.round(newX)) * 4;
+                        
+                        // Copy the pixel data
+                        resultData[newIndex] = data[index];
+                        resultData[newIndex + 1] = data[index + 1];
+                        resultData[newIndex + 2] = data[index + 2];
+                        resultData[newIndex + 3] = data[index + 3];
+                    }
+                }
+            }
+            
+            // Create a new image data with the result
+            const newImageData = new ImageData(resultData, tempCanvas.width, tempCanvas.height);
+            
+            // Put the modified image data back
+            tempCtx.putImageData(newImageData, 0, 0);
+            
+            // Draw the result back to the original canvas
+            ctx.drawImage(tempCanvas, 0, 0);
+        }
+
+        // Combined enhancement effect
+        async function applyCombinedEnhancement(ctx) {
+            // Apply all effects with reduced intensity
+            await applyNaturalRefinement(ctx);
+            await applyBridgeReduction(ctx);
+            await applyTipRefinement(ctx);
+            await applyNoseNarrowing(ctx);
+            await applyCrookedCorrection(ctx);
         }
 
         // Handle reset
@@ -656,11 +797,6 @@
             try {
                 // Reset to original image
                 if (originalImage) {
-                    // Clear all FaceMorph effects
-                    if (faceMorphInitialized && faceMorph) {
-                        await faceMorph.clear();
-                    }
-                    
                     document.getElementById('result-image').src = originalImage;
                     document.getElementById('result-container').style.display = 'block';
                     document.getElementById('download-btn').href = originalImage;
