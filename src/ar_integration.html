@@ -166,6 +166,7 @@
         let currentEffect = null;
         let originalImage = null;
         let isProcessing = false;
+        let isCameraMode = true;
         
         // Get the token from the global variable
         const clientToken = window.BANUBA_CLIENT_TOKEN;
@@ -214,6 +215,7 @@
 
         // Mode switching
         document.getElementById('camera-mode').addEventListener('click', async () => {
+            isCameraMode = true;
             document.getElementById('image-upload').style.display = 'none';
             document.getElementById('camera-mode').classList.add('active');
             document.getElementById('upload-mode').classList.remove('active');
@@ -228,6 +230,7 @@
         });
 
         document.getElementById('upload-mode').addEventListener('click', () => {
+            isCameraMode = false;
             document.getElementById('image-upload').style.display = 'block';
             document.getElementById('upload-mode').classList.add('active');
             document.getElementById('camera-mode').classList.remove('active');
@@ -241,32 +244,42 @@
             // Hide the controls until an image is loaded
             document.querySelector('.effect-buttons').style.display = 'none';
             document.querySelector('.controls').style.display = 'none';
+            
+            // Trigger file input click
+            document.getElementById('image-upload').click();
         });
 
         // Image upload handling
         document.getElementById('image-upload').addEventListener('change', async (event) => {
             const file = event.target.files[0];
             if (file) {
-                // Create a URL for the file
-                const imageUrl = URL.createObjectURL(file);
-                
-                // Initialize player if not already initialized
-                if (!player) {
-                    player = await Player.create({ clientToken: clientToken });
-                    await player.addModule(new Module("https://cdn.jsdelivr.net/npm/@banuba/webar/dist/modules/face_tracker.zip"));
-                    Dom.render(player, "#webar-app");
-                    capture = new ImageCapture(player);
+                try {
+                    // Create a URL for the file
+                    const imageUrl = URL.createObjectURL(file);
+                    
+                    // Initialize player if not already initialized
+                    if (!player) {
+                        player = await Player.create({ clientToken: clientToken });
+                        await player.addModule(new Module("https://cdn.jsdelivr.net/npm/@banuba/webar/dist/modules/face_tracker.zip"));
+                        Dom.render(player, "#webar-app");
+                        capture = new ImageCapture(player);
+                    }
+                    
+                    // Load the image
+                    await player.loadImage(imageUrl);
+                    
+                    // Store the original image
+                    originalImage = imageUrl;
+                    
+                    // Show the controls
+                    document.querySelector('.effect-buttons').style.display = 'flex';
+                    document.querySelector('.controls').style.display = 'flex';
+                    
+                    console.log('Image loaded successfully');
+                } catch (error) {
+                    console.error('Error loading image:', error);
+                    alert('Error loading image: ' + error.message);
                 }
-                
-                // Load the image
-                await player.loadImage(imageUrl);
-                
-                // Store the original image
-                originalImage = imageUrl;
-                
-                // Show the controls
-                document.querySelector('.effect-buttons').style.display = 'flex';
-                document.querySelector('.controls').style.display = 'flex';
             }
         });
 
@@ -293,6 +306,7 @@
                     } catch (error) {
                         console.error(`Failed to apply effect ${effectType}:`, error);
                         isProcessing = false;
+                        alert('Failed to apply effect: ' + error.message);
                     }
                 }
             });
@@ -405,10 +419,7 @@
         });
 
         // Custom effect functions
-        function applyNaturalRefinement(ctx, landmarks) {
-            // Get nose landmarks
-            const nosePoints = getNosePoints(landmarks);
-            
+        function applyNaturalRefinement(ctx, nosePoints) {
             // Create a smooth mask for the nose area
             ctx.save();
             ctx.beginPath();
@@ -430,8 +441,7 @@
             ctx.restore();
         }
 
-        function applyBridgeReduction(ctx, landmarks) {
-            const nosePoints = getNosePoints(landmarks);
+        function applyBridgeReduction(ctx, nosePoints) {
             const bridgeTop = nosePoints[0];
             const bridgeBottom = nosePoints[nosePoints.length - 1];
             
@@ -455,8 +465,7 @@
             ctx.restore();
         }
 
-        function applyTipRefinement(ctx, landmarks) {
-            const nosePoints = getNosePoints(landmarks);
+        function applyTipRefinement(ctx, nosePoints) {
             const tip = nosePoints[nosePoints.length - 1];
             
             // Create circular mask for tip
@@ -476,8 +485,7 @@
             ctx.restore();
         }
 
-        function applyNoseNarrowing(ctx, landmarks) {
-            const nosePoints = getNosePoints(landmarks);
+        function applyNoseNarrowing(ctx, nosePoints) {
             const left = nosePoints[0];
             const right = nosePoints[nosePoints.length - 1];
             
@@ -500,8 +508,7 @@
             ctx.restore();
         }
 
-        function applyCrookedCorrection(ctx, landmarks) {
-            const nosePoints = getNosePoints(landmarks);
+        function applyCrookedCorrection(ctx, nosePoints) {
             const top = nosePoints[0];
             const bottom = nosePoints[nosePoints.length - 1];
             
@@ -530,13 +537,13 @@
             ctx.restore();
         }
 
-        function applyCombinedEnhancement(ctx, landmarks) {
+        function applyCombinedEnhancement(ctx, nosePoints) {
             // Apply all effects with reduced intensity
-            applyNaturalRefinement(ctx, landmarks);
-            applyBridgeReduction(ctx, landmarks);
-            applyTipRefinement(ctx, landmarks);
-            applyNoseNarrowing(ctx, landmarks);
-            applyCrookedCorrection(ctx, landmarks);
+            applyNaturalRefinement(ctx, nosePoints);
+            applyBridgeReduction(ctx, nosePoints);
+            applyTipRefinement(ctx, nosePoints);
+            applyNoseNarrowing(ctx, nosePoints);
+            applyCrookedCorrection(ctx, nosePoints);
         }
 
         function getNosePoints(landmarks) {
