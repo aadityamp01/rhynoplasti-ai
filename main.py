@@ -1,5 +1,5 @@
 import streamlit as st
-from src.app import main
+import src.app as app
 
 if __name__ == "__main__":
-    main() 
+    app.main() 
