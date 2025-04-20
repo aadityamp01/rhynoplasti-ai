@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Banuba Rhinoplasty Simulator</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            background-color: #f5f5f5;
+        }
+        .container {
+            max-width: 1200px;
+            width: 100%;
+            padding: 20px;
+        }
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .header h1 {
+            color: #2c3e50;
+        }
+        .header p {
+            color: #7f8c8d;
+            font-size: 1.2em;
+        }
+        .simulator-container {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 20px;
+            justify-content: center;
+        }
+        .video-container {
+            width: 640px;
+            height: 480px;
+            background-color: #000;
+            border-radius: 10px;
+            overflow: hidden;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+        }
+        .controls {
+            width: 300px;
+            background-color: #fff;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+        }
+        .control-group {
+            margin-bottom: 20px;
+        }
+        .control-group label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: bold;
+            color: #2c3e50;
+        }
+        select, button {
+            width: 100%;
+            padding: 10px;
+            border-radius: 5px;
+            border: 1px solid #ddd;
+            margin-bottom: 10px;
+        }
+        button {
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            cursor: pointer;
+            font-weight: bold;
+        }
+        button:hover {
+            background-color: #45a049;
+        }
+        .slider-container {
+            margin-top: 10px;
+        }
+        .slider {
+            width: 100%;
+        }
+        .result-container {
+            margin-top: 20px;
+            text-align: center;
+        }
+        .result-image {
+            max-width: 100%;
+            border-radius: 10px;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+        }
+        .download-btn {
+            display: inline-block;
+            margin-top: 10px;
+            padding: 10px 20px;
+            background-color: #3498db;
+            color: white;
+            text-decoration: none;
+            border-radius: 5px;
+        }
+        .download-btn:hover {
+            background-color: #2980b9;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>AI Rhinoplasty Simulator</h1>
+            <p>Experience how you might look after rhinoplasty using advanced AI technology</p>
+        </div>
+        
+        <div class="simulator-container">
+            <div class="video-container" id="banuba-player"></div>
+            
+            <div class="controls">
+                <div class="control-group">
+                    <label for="effect-select">Select Rhinoplasty Type</label>
+                    <select id="effect-select">
+                        <option value="Natural Refinement">✨ Natural Refinement</option>
+                        <option value="Nose Bridge Reduction">📉 Nose Bridge Reduction</option>
+                        <option value="Tip Refinement">🎯 Tip Refinement</option>
+                        <option value="Wide Nose Narrowing">↔️ Wide Nose Narrowing</option>
+                        <option value="Crooked Nose Correction">📏 Crooked Nose Correction</option>
+                        <option value="Combined Enhancement">🌟 Combined Enhancement</option>
+                    </select>
+                </div>
+                
+                <div class="control-group">
+                    <label for="intensity-slider">Effect Intensity</label>
+                    <div class="slider-container">
+                        <input type="range" min="0" max="100" value="70" class="slider" id="intensity-slider">
+                        <div id="intensity-value">70%</div>
+                    </div>
+                </div>
+                
+                <button id="apply-effect-btn">Apply Effect</button>
+                <button id="capture-btn">Capture Result</button>
+                <button id="reset-btn">Reset Camera</button>
+            </div>
+        </div>
+        
+        <div class="result-container" id="result-container" style="display: none;">
+            <h2>Your Rhinoplasty Result</h2>
+            <img id="result-image" class="result-image" src="" alt="Rhinoplasty Result">
+            <a id="download-btn" class="download-btn" download="rhinoplasty_result.png">Download Result</a>
+        </div>
+    </div>
+
+    <!-- Load Banuba SDK -->
+    <script src="https://cdn.jsdelivr.net/npm/@banuba/webar/dist/banuba-webar.min.js"></script>
+    <script src="banuba_integration.js"></script>
+    <script>
+        // Initialize the simulator when the page loads
+        document.addEventListener('DOMContentLoaded', async () => {
+            // Get the client token from the environment
+            const clientToken = 'YOUR_BANUBA_CLIENT_TOKEN'; // Replace with actual token
+            
+            // Initialize the simulator
+            const simulator = new BanubaRhinoplastySimulator(clientToken);
+            await simulator.initialize('banuba-player');
+            
+            // Set up event listeners
+            const effectSelect = document.getElementById('effect-select');
+            const intensitySlider = document.getElementById('intensity-slider');
+            const intensityValue = document.getElementById('intensity-value');
+            const applyEffectBtn = document.getElementById('apply-effect-btn');
+            const captureBtn = document.getElementById('capture-btn');
+            const resetBtn = document.getElementById('reset-btn');
+            const resultContainer = document.getElementById('result-container');
+            const resultImage = document.getElementById('result-image');
+            const downloadBtn = document.getElementById('download-btn');
+            
+            // Update intensity value display
+            intensitySlider.addEventListener('input', () => {
+                intensityValue.textContent = `${intensitySlider.value}%`;
+            });
+            
+            // Apply effect button
+            applyEffectBtn.addEventListener('click', async () => {
+                const effectName = effectSelect.value;
+                const intensity = parseInt(intensitySlider.value) / 100;
+                
+                await simulator.applyEffect(effectName, intensity);
+            });
+            
+            // Capture result button
+            captureBtn.addEventListener('click', async () => {
+                const imageData = await simulator.captureImage();
+                resultImage.src = imageData;
+                resultContainer.style.display = 'block';
+                
+                // Set up download button
+                downloadBtn.href = imageData;
+                downloadBtn.download = `rhinoplasty_result_${effectSelect.value.toLowerCase().replace(' ', '_')}.png`;
+            });
+            
+            // Reset camera button
+            resetBtn.addEventListener('click', async () => {
+                await simulator.stop();
+                await simulator.initialize('banuba-player');
+            });
+        });
+    </script>
+</body>
+</html> 

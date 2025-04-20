@@ -1,52 +1,102 @@
 # AI Rhinoplasty Simulator
 
-This Streamlit application uses Hugging Face's Stable Diffusion and MediaPipe to simulate rhinoplasty results on uploaded facial images.
-
-## Setup Instructions
-
-1. **Local Environment Setup**
-   ```bash
-   # Create a virtual environment
-   python -m venv venv
-   source venv/bin/activate  # On Windows: venv\Scripts\activate
-
-   # Install dependencies
-   pip install -r requirements.txt
-   ```
-
-2. **Running the App**
-   ```bash
-   streamlit run src/app.py
-   ```
+An advanced AI-powered application for simulating rhinoplasty results using computer vision and augmented reality technology.
 
 ## Features
 
-- Upload facial images
-- Automatic nose region detection using MediaPipe
-- AI-powered rhinoplasty simulation using Stable Diffusion
-- Real-time preview of results
+- **Banuba AR Integration**: Real-time rhinoplasty simulation using your camera
+- **Local Processing**: Upload photos for rhinoplasty simulation using computer vision
+- **Multiple Rhinoplasty Options**: Choose from various rhinoplasty types
+- **Adjustable Intensity**: Control the strength of the rhinoplasty effect
+- **Download Results**: Save your simulated results for reference
 
-## Deployment
+## Rhinoplasty Options
 
-To deploy on Streamlit Community Cloud:
+- **Natural Refinement**: Subtle changes to create a more balanced nose
+- **Nose Bridge Reduction**: Reduce the height of the nose bridge
+- **Tip Refinement**: Refine the nose tip to be more defined
+- **Wide Nose Narrowing**: Narrow a wide nose for better facial harmony
+- **Crooked Nose Correction**: Straighten a crooked nose
+- **Combined Enhancement**: Comprehensive nose reshaping
 
-1. Push your code to GitHub
-2. Connect your GitHub repository to Streamlit Cloud
-3. Deploy!
+## Setup Instructions
 
-## Requirements
+### Prerequisites
 
-- Python 3.8+
-- All dependencies listed in requirements.txt
+- Python 3.10 or higher
+- Node.js and npm (for Banuba SDK)
+- Web browser with WebGL 2.0 support
+
+### Installation
+
+1. Clone the repository:
+   ```
+   git clone https://github.com/yourusername/rhinoplasty-ai.git
+   cd rhinoplasty-ai
+   ```
+
+2. Install Python dependencies:
+   ```
+   pip install -r requirements.txt
+   ```
+
+### Banuba SDK Setup
+
+1. Obtain a Banuba client token:
+   - Visit [Banuba's website](https://www.banuba.com/)
+   - Sign up for a developer account
+   - Create a new project and get your client token
+
+2. Add your client token to Streamlit secrets:
+   - For local development, create a `.streamlit/secrets.toml` file with:
+     ```toml
+     BANUBA_CLIENT_TOKEN = "your_banuba_client_token_here"
+     ```
+   - For Streamlit Cloud deployment, add the secret in the Streamlit Cloud dashboard
+
+3. Create effect files for each rhinoplasty type:
+   - Place the effect files in the `src/effects` directory
+   - Name them according to the pattern in `banuba_integration.js`
+
+## Running the Application
+
+1. Start the Streamlit app:
+   ```
+   streamlit run src/app.py
+   ```
+
+2. Open your browser and navigate to the URL shown in the terminal (typically http://localhost:8501)
+
+3. Choose between:
+   - **Banuba AR Simulation**: Use your camera for real-time simulation
+   - **Local Processing**: Upload a photo for simulation
 
 ## How It Works
 
-1. The app uses MediaPipe Face Mesh to detect facial landmarks
-2. It creates a mask around the nose area
-3. Stable Diffusion inpainting is used to generate a realistic rhinoplasty result
-4. The result is displayed alongside the original image
+### Banuba AR Integration
 
-## Notes
+The Banuba SDK provides advanced facial tracking and augmented reality capabilities. The application uses this technology to:
 
-- The first run may take longer as it downloads the Stable Diffusion model
-- For better performance, a GPU is recommended but not required 
+1. Track facial landmarks in real-time
+2. Apply 3D transformations to simulate rhinoplasty
+3. Render the modified face with realistic lighting and shadows
+
+### Local Processing
+
+For uploaded photos, the application uses:
+
+1. MediaPipe Face Mesh for facial landmark detection
+2. Computer vision techniques for nose reshaping
+3. Image processing algorithms for realistic results
+
+## Contributing
+
+Contributions are welcome! Please feel free to submit a Pull Request.
+
+## License
+
+This project is licensed under the MIT License - see the LICENSE file for details.
+
+## Disclaimer
+
+This application is for educational and entertainment purposes only. It should not be used as a substitute for professional medical advice. Always consult with a qualified healthcare provider for medical procedures. 
