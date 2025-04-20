@@ -485,70 +485,66 @@
             // Apply different effects based on the type
             switch (effectType) {
                 case 'natural':
-                    // Natural refinement - subtle face adjustments
-                    FaceMorph.face({
-                        narrowing: 0.3,
-                        v_shape: 0.2,
-                        cheekbones_narrowing: 0.2,
-                        cheeks_narrowing: 0.2,
-                        jaw_narrowing: 0.3,
-                        chin_shortening: 0.1,
-                        chin_narrowing: 0.2,
-                        sunken_cheeks: 0.1,
-                        cheeks_jaw_narrowing: 0.2
-                    });
+                    // Natural refinement - subtle rhinoplasty results
                     FaceMorph.nose({
-                        width: 0.2,
-                        length: 0.1,
-                        tip_width: 0.1,
-                        down_up: 0.1,
-                        sellion: 0.1
+                        width: 0.2,      // Slightly narrower nose
+                        length: 0.1,     // Minimal length adjustment
+                        tip_width: 0.2,  // Refined tip
+                        down_up: 0.2,    // Slight lift
+                        sellion: 0.3     // Enhanced bridge definition
+                    });
+                    FaceMorph.face({
+                        narrowing: 0.2,   // Subtle face contouring
+                        v_shape: 0.2,    // Enhanced facial harmony
+                        cheekbones_narrowing: 0.1,
+                        cheeks_narrowing: 0.1,
+                        jaw_narrowing: 0.2
                     });
                     break;
                     
                 case 'bridge':
-                    // Bridge reduction - focus on nose bridge
+                    // Bridge reduction - focus on dorsal hump reduction
                     FaceMorph.nose({
-                        width: 0.4,
-                        length: 0.2,
-                        tip_width: 0.2,
-                        down_up: 0.2,
-                        sellion: 0.3
+                        width: 0.3,      // Narrower bridge
+                        length: 0.2,     // Reduced length
+                        tip_width: 0.3,  // Refined tip
+                        down_up: 0.3,    // Significant lift
+                        sellion: 0.4     // Strong bridge definition
                     });
                     FaceMorph.face({
-                        narrowing: 0.4,
+                        narrowing: 0.3,
                         v_shape: 0.3,
-                        cheekbones_narrowing: 0.3,
-                        cheeks_narrowing: 0.3,
-                        jaw_narrowing: 0.4
+                        cheekbones_narrowing: 0.2,
+                        cheeks_narrowing: 0.2,
+                        jaw_narrowing: 0.3
                     });
                     break;
                     
                 case 'tip':
-                    // Tip refinement - focus on nose tip
+                    // Tip refinement - focus on tip projection and definition
                     FaceMorph.nose({
                         width: 0.2,
-                        length: 0.3,
-                        tip_width: 0.4,
-                        down_up: 0.3,
+                        length: 0.3,     // Increased projection
+                        tip_width: 0.4,  // Significant tip refinement
+                        down_up: 0.4,    // Strong lift
                         sellion: 0.2
                     });
                     FaceMorph.face({
-                        narrowing: 0.3,
+                        narrowing: 0.2,
                         v_shape: 0.2,
-                        cheekbones_narrowing: 0.2,
-                        cheeks_narrowing: 0.2
+                        cheekbones_narrowing: 0.1,
+                        cheeks_narrowing: 0.1
                     });
                     break;
                     
                 case 'narrow':
-                    // Nose narrowing - focus on width
+                    // Nose narrowing - focus on overall width reduction
                     FaceMorph.nose({
-                        width: 0.5,
+                        width: 0.5,      // Significant width reduction
                         length: 0.2,
-                        tip_width: 0.3,
-                        down_up: 0.1,
-                        sellion: 0.2
+                        tip_width: 0.4,  // Narrower tip
+                        down_up: 0.2,
+                        sellion: 0.3
                     });
                     FaceMorph.face({
                         narrowing: 0.4,
@@ -560,13 +556,13 @@
                     break;
                     
                 case 'straight':
-                    // Crooked correction - focus on alignment
+                    // Crooked correction - focus on alignment and symmetry
                     FaceMorph.nose({
                         width: 0.3,
                         length: 0.2,
-                        tip_width: 0.2,
-                        down_up: 0.2,
-                        sellion: 0.4
+                        tip_width: 0.3,
+                        down_up: 0.3,
+                        sellion: 0.5     // Strong correction for alignment
                     });
                     FaceMorph.face({
                         narrowing: 0.3,
@@ -577,38 +573,33 @@
                     break;
                     
                 case 'combined':
-                    // Combined enhancement - balanced approach
+                    // Combined enhancement - comprehensive rhinoplasty simulation
                     FaceMorph.face({
-                        narrowing: 0.4,
+                        narrowing: 0.3,
                         v_shape: 0.3,
-                        cheekbones_narrowing: 0.3,
-                        cheeks_narrowing: 0.3,
-                        jaw_narrowing: 0.4,
-                        chin_shortening: 0.2,
-                        chin_narrowing: 0.2,
-                        sunken_cheeks: 0.1,
-                        cheeks_jaw_narrowing: 0.2
+                        cheekbones_narrowing: 0.2,
+                        cheeks_narrowing: 0.2,
+                        jaw_narrowing: 0.3,
+                        chin_shortening: 0.1,
+                        chin_narrowing: 0.2
                     });
                     FaceMorph.nose({
-                        width: 0.3,
-                        length: 0.2,
-                        tip_width: 0.3,
-                        down_up: 0.2,
-                        sellion: 0.3
+                        width: 0.3,      // Balanced width reduction
+                        length: 0.2,     // Balanced length
+                        tip_width: 0.3,  // Refined tip
+                        down_up: 0.3,    // Balanced lift
+                        sellion: 0.4     // Enhanced bridge
                     });
+                    // Subtle complementary adjustments
                     FaceMorph.eyes({
-                        rounding: 0.3,
-                        enlargement: 0.2,
+                        rounding: 0.2,
                         height: 0.2,
                         spacing: 0.2
                     });
                     FaceMorph.lips({
                         size: 0.2,
                         height: 0.2,
-                        thickness: 0.1,
-                        mouth_size: 0.1,
-                        smile: 0.2,
-                        shape: 0.2
+                        thickness: 0.1
                     });
                     break;
             }
