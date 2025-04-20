@@ -627,16 +627,16 @@
             const tempCtx = tempCanvas.getContext('2d');
             tempCtx.putImageData(new ImageData(new Uint8ClampedArray(data), width, height), 0, 0);
             
-            // Calculate nose bridge points
+            // Calculate nose bridge points with more precise positioning
             const bridgePoints = [];
-            const numPoints = 8;
+            const numPoints = 6;
             for (let i = 0; i < numPoints; i++) {
                 const y = centerY - radius + (i * radius * 2 / (numPoints - 1));
                 const x = centerX;
                 bridgePoints.push({x, y});
             }
             
-            // Apply conservative bridge modification
+            // Apply very conservative bridge modification
             for (let y = 0; y < height; y++) {
                 for (let x = 0; x < width; x++) {
                     const dx = x - centerX;
@@ -645,9 +645,10 @@
                     
                     if (distance < radius) {
                         const i = (y * width + x) * 4;
-                        const factor = Math.pow(1 - (distance / radius), 2) * strength * 0.5;
+                        // Use cubic falloff for smoother transition
+                        const factor = Math.pow(1 - (distance / radius), 3) * strength * 0.3;
                         
-                        // Calculate gentle displacement
+                        // Calculate minimal displacement
                         let shiftX = 0;
                         let shiftY = 0;
                         
@@ -665,24 +666,25 @@
                         if (closestPoint) {
                             // Calculate vertical shift based on position
                             const verticalProgress = (y - (centerY - radius)) / (radius * 2);
-                            shiftY = Math.sin(verticalProgress * Math.PI) * strength * 1.5;
+                            shiftY = Math.sin(verticalProgress * Math.PI) * strength * 0.8;
                             
                             // Calculate horizontal shift
                             const horizontalOffset = x - closestPoint.x;
-                            shiftX = Math.sin(horizontalOffset / radius * Math.PI) * strength;
+                            shiftX = Math.sin(horizontalOffset / radius * Math.PI) * strength * 0.5;
                         }
                         
-                        // Apply the shifts with reduced intensity
-                        const targetX = Math.round(x + shiftX * 0.5);
-                        const targetY = Math.round(y + shiftY * 0.5);
+                        // Apply the shifts with minimal intensity
+                        const targetX = Math.round(x + shiftX * 0.3);
+                        const targetY = Math.round(y + shiftY * 0.3);
                         
                         if (targetX >= 0 && targetX < width && targetY >= 0 && targetY < height) {
                             const targetI = (targetY * width + targetX) * 4;
-                            const blendFactor = Math.min(0.7, factor);
+                            const blendFactor = Math.min(0.5, factor);
                             
-                            data[targetI] = data[i] * (1 - blendFactor) + data[targetI] * blendFactor;
-                            data[targetI+1] = data[i+1] * (1 - blendFactor) + data[targetI+1] * blendFactor;
-                            data[targetI+2] = data[i+2] * (1 - blendFactor) + data[targetI+2] * blendFactor;
+                            // Preserve original pixel values more
+                            data[targetI] = data[i] * (1 - blendFactor * 0.7) + data[targetI] * (blendFactor * 0.7);
+                            data[targetI+1] = data[i+1] * (1 - blendFactor * 0.7) + data[targetI+1] * (blendFactor * 0.7);
+                            data[targetI+2] = data[i+2] * (1 - blendFactor * 0.7) + data[targetI+2] * (blendFactor * 0.7);
                         }
                     }
                 }
@@ -698,17 +700,17 @@
             const tempCtx = tempCanvas.getContext('2d');
             tempCtx.putImageData(new ImageData(new Uint8ClampedArray(data), width, height), 0, 0);
             
-            // Calculate tip points for better control
+            // Calculate tip points with more precise positioning
             const tipPoints = [];
-            const numPoints = 6;
+            const numPoints = 4;
             for (let i = 0; i < numPoints; i++) {
                 const angle = (i / numPoints) * Math.PI * 2;
-                const x = tipX + Math.cos(angle) * radius * 0.4;
-                const y = tipY + Math.sin(angle) * radius * 0.4;
+                const x = tipX + Math.cos(angle) * radius * 0.3;
+                const y = tipY + Math.sin(angle) * radius * 0.3;
                 tipPoints.push({x, y});
             }
             
-            // Apply conservative tip enhancement
+            // Apply very conservative tip enhancement
             for (let y = 0; y < height; y++) {
                 for (let x = 0; x < width; x++) {
                     const dx = x - tipX;
@@ -717,9 +719,10 @@
                     
                     if (distance < radius) {
                         const i = (y * width + x) * 4;
-                        const factor = Math.pow(1 - (distance / radius), 2) * strength * 0.5;
+                        // Use cubic falloff for smoother transition
+                        const factor = Math.pow(1 - (distance / radius), 3) * strength * 0.3;
                         
-                        // Calculate gentle enhancement
+                        // Calculate minimal enhancement
                         let enhancement = 1;
                         let highlight = 1;
                         
@@ -738,29 +741,29 @@
                             // Calculate vertical position
                             const verticalProgress = (y - (tipY - radius)) / (radius * 2);
                             
-                            // Apply gentler enhancement near the tip
+                            // Apply very gentle enhancement near the tip
                             if (verticalProgress > 0.7) {
-                                enhancement = 1 + factor * 0.1;
-                                highlight = 1 + factor * 0.15;
-                            } else {
                                 enhancement = 1 + factor * 0.05;
                                 highlight = 1 + factor * 0.08;
+                            } else {
+                                enhancement = 1 + factor * 0.03;
+                                highlight = 1 + factor * 0.05;
                             }
                             
-                            // Add subtle lift effect
+                            // Add very subtle lift effect
                             if (verticalProgress > 0.8) {
-                                const liftFactor = (verticalProgress - 0.8) * 2;
-                                enhancement *= (1 + liftFactor * strength * 0.5);
+                                const liftFactor = (verticalProgress - 0.8) * 1;
+                                enhancement *= (1 + liftFactor * strength * 0.3);
                             }
                         }
                         
-                        // Apply the enhancements with reduced intensity
+                        // Apply the enhancements with minimal intensity
                         data[i] = Math.min(255, data[i] * enhancement);
                         data[i+1] = Math.min(255, data[i+1] * enhancement);
                         data[i+2] = Math.min(255, data[i+2] * enhancement);
                         
-                        // Add subtle highlight
-                        if (distance < radius * 0.5) {
+                        // Add very subtle highlight
+                        if (distance < radius * 0.4) {
                             data[i] = Math.min(255, data[i] * highlight);
                             data[i+1] = Math.min(255, data[i+1] * highlight);
                             data[i+2] = Math.min(255, data[i+2] * highlight);
@@ -806,16 +809,16 @@
             const tempCtx = tempCanvas.getContext('2d');
             tempCtx.putImageData(new ImageData(new Uint8ClampedArray(data), width, height), 0, 0);
             
-            // Calculate nose line points
+            // Calculate nose line points with more precise positioning
             const nosePoints = [];
-            const numPoints = 10;
+            const numPoints = 8;
             for (let i = 0; i < numPoints; i++) {
                 const y = centerY - radius + (i * radius * 2 / (numPoints - 1));
                 const x = centerX;
                 nosePoints.push({x, y});
             }
             
-            // Apply conservative straightening
+            // Apply very conservative straightening
             for (let y = 0; y < height; y++) {
                 for (let x = 0; x < width; x++) {
                     const dx = x - centerX;
@@ -824,7 +827,8 @@
                     
                     if (distance < radius) {
                         const i = (y * width + x) * 4;
-                        const factor = Math.pow(1 - (distance / radius), 2) * strength * 0.5;
+                        // Use cubic falloff for smoother transition
+                        const factor = Math.pow(1 - (distance / radius), 3) * strength * 0.3;
                         
                         // Find closest nose point
                         let minDist = Infinity;
@@ -843,18 +847,19 @@
                             const targetAngle = Math.atan2(closestPoint.y - centerY, closestPoint.x - centerX);
                             const angleDiff = targetAngle - angle;
                             
-                            // Calculate gentle displacement
-                            const displacement = Math.sin(angleDiff) * distance * strength * 0.5;
+                            // Calculate minimal displacement
+                            const displacement = Math.sin(angleDiff) * distance * strength * 0.3;
                             const targetX = x + Math.cos(angle) * displacement;
                             const targetY = y + Math.sin(angle) * displacement;
                             
                             if (targetX >= 0 && targetX < width && targetY >= 0 && targetY < height) {
                                 const targetI = (Math.round(targetY) * width + Math.round(targetX)) * 4;
-                                const blendFactor = Math.min(0.7, factor);
+                                const blendFactor = Math.min(0.5, factor);
                                 
-                                data[targetI] = data[i] * (1 - blendFactor) + data[targetI] * blendFactor;
-                                data[targetI+1] = data[i+1] * (1 - blendFactor) + data[targetI+1] * blendFactor;
-                                data[targetI+2] = data[i+2] * (1 - blendFactor) + data[targetI+2] * blendFactor;
+                                // Preserve original pixel values more
+                                data[targetI] = data[i] * (1 - blendFactor * 0.7) + data[targetI] * (blendFactor * 0.7);
+                                data[targetI+1] = data[i+1] * (1 - blendFactor * 0.7) + data[targetI+1] * (blendFactor * 0.7);
+                                data[targetI+2] = data[i+2] * (1 - blendFactor * 0.7) + data[targetI+2] * (blendFactor * 0.7);
                             }
                         }
                     }
