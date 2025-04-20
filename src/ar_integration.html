@@ -48,6 +48,8 @@
             display: flex;
             gap: 10px;
             justify-content: center;
+            visibility: visible !important;
+            opacity: 1 !important;
         }
         .mode-switch {
             margin-bottom: 20px;
@@ -65,6 +67,8 @@
             gap: 10px;
             justify-content: center;
             margin-top: 20px;
+            visibility: visible !important;
+            opacity: 1 !important;
         }
         button {
             padding: 8px 16px;
@@ -111,6 +115,25 @@
             border-radius: 8px;
             overflow: hidden;
         }
+        .ready-message {
+            background-color: #d4edda;
+            color: #155724;
+            padding: 10px;
+            border-radius: 5px;
+            margin: 15px 0;
+            text-align: center;
+            font-weight: bold;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .effect-instructions {
+            background-color: #cce5ff;
+            color: #004085;
+            padding: 10px;
+            border-radius: 5px;
+            margin: 15px 0;
+            text-align: center;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
     </style>
 </head>
 <body>
@@ -128,6 +151,24 @@
         
         <div id="permission-message">
             Camera permission is required for AR simulation. Please allow camera access.
+        </div>
+        
+        <!-- Ready message - will be shown after image upload -->
+        <div id="ready-message" class="ready-message" style="display: none;">
+            Image loaded! Click on any effect button below to apply rhinoplasty effects.
+        </div>
+        
+        <!-- Effect instructions -->
+        <div id="effect-instructions" class="effect-instructions" style="display: none;">
+            <p>Choose an effect to apply to your image:</p>
+            <ul style="text-align: left; display: inline-block;">
+                <li><strong>Natural Refinement:</strong> Subtle brightness and contrast adjustments</li>
+                <li><strong>Bridge Reduction:</strong> Simulates a smaller nose bridge</li>
+                <li><strong>Tip Refinement:</strong> Brightens and lifts the nose tip</li>
+                <li><strong>Nose Narrowing:</strong> Makes the nose appear narrower</li>
+                <li><strong>Crooked Correction:</strong> Straightens the nose</li>
+                <li><strong>Combined Enhancement:</strong> Applies all effects with reduced intensity</li>
+            </ul>
         </div>
         
         <!-- Banuba WebAR container -->
@@ -260,12 +301,14 @@
             const file = event.target.files[0];
             if (file) {
                 try {
+                    console.log('File selected:', file.name);
                     // Create a URL for the file
                     const imageUrl = URL.createObjectURL(file);
                     
                     // Create an image element to load the file
                     const img = new Image();
                     img.onload = async () => {
+                        console.log('Image loaded, dimensions:', img.width, 'x', img.height);
                         // Set canvas dimensions to match the image
                         canvas.width = img.width;
                         canvas.height = img.height;
@@ -281,11 +324,33 @@
                         document.getElementById('result-container').style.display = 'block';
                         document.getElementById('download-btn').href = originalImage;
                         
-                        // Show the controls
-                        document.querySelector('.effect-buttons').style.display = 'flex';
-                        document.querySelector('.controls').style.display = 'flex';
+                        // Show the controls - make sure they're visible
+                        const effectButtons = document.querySelector('.effect-buttons');
+                        const controls = document.querySelector('.controls');
                         
-                        console.log('Image loaded successfully');
+                        effectButtons.style.display = 'flex';
+                        controls.style.display = 'flex';
+                        
+                        // Force the buttons to be visible with inline styles
+                        effectButtons.style.visibility = 'visible';
+                        effectButtons.style.opacity = '1';
+                        controls.style.visibility = 'visible';
+                        controls.style.opacity = '1';
+                        
+                        console.log('Controls displayed:', 
+                            'Effect buttons visible:', effectButtons.style.display, 
+                            'Controls visible:', controls.style.display);
+                        
+                        // Add a visual indicator that the image is ready for effects
+                        const header = document.querySelector('.header');
+                        const readyMessage = document.createElement('div');
+                        readyMessage.style.color = 'green';
+                        readyMessage.style.marginTop = '10px';
+                        readyMessage.style.fontWeight = 'bold';
+                        readyMessage.textContent = 'Image loaded! Click on any effect button to apply rhinoplasty effects.';
+                        header.appendChild(readyMessage);
+                        
+                        console.log('Image loaded successfully and ready for effects');
                     };
                     
                     img.src = imageUrl;
@@ -307,22 +372,28 @@
         };
 
         Object.keys(effects).forEach(effectId => {
-            document.getElementById(effectId).addEventListener('click', async () => {
-                if (!isProcessing) {
-                    try {
-                        isProcessing = true;
-                        // Apply the effect using our custom processing
-                        const effectType = effects[effectId];
-                        await applyCustomEffect(effectType);
-                        console.log(`Applied effect: ${effectType}`);
-                        isProcessing = false;
-                    } catch (error) {
-                        console.error(`Failed to apply effect ${effectType}:`, error);
-                        isProcessing = false;
-                        alert('Failed to apply effect: ' + error.message);
+            const button = document.getElementById(effectId);
+            if (button) {
+                button.addEventListener('click', async () => {
+                    console.log('Effect button clicked:', effectId);
+                    if (!isProcessing) {
+                        try {
+                            isProcessing = true;
+                            // Apply the effect using our custom processing
+                            const effectType = effects[effectId];
+                            await applyCustomEffect(effectType);
+                            console.log(`Applied effect: ${effectType}`);
+                            isProcessing = false;
+                        } catch (error) {
+                            console.error(`Failed to apply effect ${effectType}:`, error);
+                            isProcessing = false;
+                            alert('Failed to apply effect: ' + error.message);
+                        }
                     }
-                }
-            });
+                });
+            } else {
+                console.error('Effect button not found:', effectId);
+            }
         });
 
         // Custom effect application
