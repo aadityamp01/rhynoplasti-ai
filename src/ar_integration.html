@@ -485,449 +485,136 @@
             // Apply different effects based on the type
             switch (effectType) {
                 case 'natural':
-                    // Natural refinement - sophisticated skin softening and nose enhancement
-                    applySkinSoftening(data, canvas.width, canvas.height);
-                    applyNoseEnhancement(data, canvas.width, canvas.height, 0.8);
-                    applyColorCorrection(data, canvas.width, canvas.height);
+                    // Natural refinement - subtle face adjustments
+                    FaceMorph.face({
+                        narrowing: 0.3,
+                        v_shape: 0.2,
+                        cheekbones_narrowing: 0.2,
+                        cheeks_narrowing: 0.2,
+                        jaw_narrowing: 0.3,
+                        chin_shortening: 0.1,
+                        chin_narrowing: 0.2,
+                        sunken_cheeks: 0.1,
+                        cheeks_jaw_narrowing: 0.2
+                    });
+                    FaceMorph.nose({
+                        width: 0.2,
+                        length: 0.1,
+                        tip_width: 0.1,
+                        down_up: 0.1,
+                        sellion: 0.1
+                    });
                     break;
                     
                 case 'bridge':
-                    // Bridge reduction - advanced nose bridge modification
-                    const centerX = canvas.width / 2;
-                    const centerY = canvas.height / 2;
-                    const radius = Math.min(canvas.width, canvas.height) * 0.15;
-                    
-                    // Apply sophisticated bridge modification
-                    applyNoseBridgeModification(data, canvas.width, canvas.height, centerX, centerY, radius, 0.7);
-                    applySkinSoftening(data, canvas.width, canvas.height);
-                    applyColorCorrection(data, canvas.width, canvas.height);
+                    // Bridge reduction - focus on nose bridge
+                    FaceMorph.nose({
+                        width: 0.4,
+                        length: 0.2,
+                        tip_width: 0.2,
+                        down_up: 0.2,
+                        sellion: 0.3
+                    });
+                    FaceMorph.face({
+                        narrowing: 0.4,
+                        v_shape: 0.3,
+                        cheekbones_narrowing: 0.3,
+                        cheeks_narrowing: 0.3,
+                        jaw_narrowing: 0.4
+                    });
                     break;
                     
                 case 'tip':
-                    // Tip refinement - advanced tip enhancement
-                    const tipX = canvas.width / 2;
-                    const tipY = canvas.height / 2 + canvas.height * 0.1;
-                    const tipRadius = Math.min(canvas.width, canvas.height) * 0.1;
-                    
-                    // Apply sophisticated tip enhancement
-                    applyNoseTipEnhancement(data, canvas.width, canvas.height, tipX, tipY, tipRadius, 0.9);
-                    applySkinSoftening(data, canvas.width, canvas.height);
-                    applyColorCorrection(data, canvas.width, canvas.height);
+                    // Tip refinement - focus on nose tip
+                    FaceMorph.nose({
+                        width: 0.2,
+                        length: 0.3,
+                        tip_width: 0.4,
+                        down_up: 0.3,
+                        sellion: 0.2
+                    });
+                    FaceMorph.face({
+                        narrowing: 0.3,
+                        v_shape: 0.2,
+                        cheekbones_narrowing: 0.2,
+                        cheeks_narrowing: 0.2
+                    });
                     break;
                     
                 case 'narrow':
-                    // Nose narrowing - advanced width modification
-                    const narrowCenterX = canvas.width / 2;
-                    const narrowCenterY = canvas.height / 2;
-                    const narrowRadius = Math.min(canvas.width, canvas.height) * 0.12;
-                    
-                    // Apply sophisticated narrowing
-                    applyNoseWidthModification(data, canvas.width, canvas.height, narrowCenterX, narrowCenterY, narrowRadius, 0.75);
-                    applySkinSoftening(data, canvas.width, canvas.height);
-                    applyColorCorrection(data, canvas.width, canvas.height);
+                    // Nose narrowing - focus on width
+                    FaceMorph.nose({
+                        width: 0.5,
+                        length: 0.2,
+                        tip_width: 0.3,
+                        down_up: 0.1,
+                        sellion: 0.2
+                    });
+                    FaceMorph.face({
+                        narrowing: 0.4,
+                        v_shape: 0.3,
+                        cheekbones_narrowing: 0.3,
+                        cheeks_narrowing: 0.3,
+                        jaw_narrowing: 0.4
+                    });
                     break;
                     
                 case 'straight':
-                    // Crooked correction - advanced straightening
-                    const straightCenterX = canvas.width / 2;
-                    const straightCenterY = canvas.height / 2;
-                    const straightRadius = Math.min(canvas.width, canvas.height) * 0.13;
-                    
-                    // Apply sophisticated straightening
-                    applyNoseStraightening(data, canvas.width, canvas.height, straightCenterX, straightCenterY, straightRadius, 0.8);
-                    applySkinSoftening(data, canvas.width, canvas.height);
-                    applyColorCorrection(data, canvas.width, canvas.height);
+                    // Crooked correction - focus on alignment
+                    FaceMorph.nose({
+                        width: 0.3,
+                        length: 0.2,
+                        tip_width: 0.2,
+                        down_up: 0.2,
+                        sellion: 0.4
+                    });
+                    FaceMorph.face({
+                        narrowing: 0.3,
+                        v_shape: 0.2,
+                        cheekbones_narrowing: 0.2,
+                        cheeks_narrowing: 0.2
+                    });
                     break;
                     
                 case 'combined':
-                    // Combined enhancement - sophisticated multi-effect application
-                    applySkinSoftening(data, canvas.width, canvas.height);
-                    applyNoseEnhancement(data, canvas.width, canvas.height, 0.6);
-                    applyNoseBridgeModification(data, canvas.width, canvas.height, canvas.width/2, canvas.height/2, 
-                        Math.min(canvas.width, canvas.height) * 0.15, 0.5);
-                    applyNoseTipEnhancement(data, canvas.width, canvas.height, canvas.width/2, canvas.height/2 + canvas.height * 0.1,
-                        Math.min(canvas.width, canvas.height) * 0.1, 0.6);
-                    applyNoseWidthModification(data, canvas.width, canvas.height, canvas.width/2, canvas.height/2,
-                        Math.min(canvas.width, canvas.height) * 0.12, 0.5);
-                    applyNoseStraightening(data, canvas.width, canvas.height, canvas.width/2, canvas.height/2,
-                        Math.min(canvas.width, canvas.height) * 0.13, 0.5);
-                    applyColorCorrection(data, canvas.width, canvas.height);
-                    return;
+                    // Combined enhancement - balanced approach
+                    FaceMorph.face({
+                        narrowing: 0.4,
+                        v_shape: 0.3,
+                        cheekbones_narrowing: 0.3,
+                        cheeks_narrowing: 0.3,
+                        jaw_narrowing: 0.4,
+                        chin_shortening: 0.2,
+                        chin_narrowing: 0.2,
+                        sunken_cheeks: 0.1,
+                        cheeks_jaw_narrowing: 0.2
+                    });
+                    FaceMorph.nose({
+                        width: 0.3,
+                        length: 0.2,
+                        tip_width: 0.3,
+                        down_up: 0.2,
+                        sellion: 0.3
+                    });
+                    FaceMorph.eyes({
+                        rounding: 0.3,
+                        enlargement: 0.2,
+                        height: 0.2,
+                        spacing: 0.2
+                    });
+                    FaceMorph.lips({
+                        size: 0.2,
+                        height: 0.2,
+                        thickness: 0.1,
+                        mouth_size: 0.1,
+                        smile: 0.2,
+                        shape: 0.2
+                    });
+                    break;
             }
             
             // Put the modified image data back on the canvas
             ctx.putImageData(imageData, 0, 0);
-        }
-
-        // Advanced skin softening function
-        function applySkinSoftening(data, width, height) {
-            const radius = 2;
-            const strength = 0.5;
-            
-            for (let y = 0; y < height; y++) {
-                for (let x = 0; x < width; x++) {
-                    const i = (y * width + x) * 4;
-                    let r = 0, g = 0, b = 0, count = 0;
-                    
-                    // Apply Gaussian blur for skin softening
-                    for (let dy = -radius; dy <= radius; dy++) {
-                        for (let dx = -radius; dx <= radius; dx++) {
-                            const nx = x + dx;
-                            const ny = y + dy;
-                            if (nx >= 0 && nx < width && ny >= 0 && ny < height) {
-                                const ni = (ny * width + nx) * 4;
-                                const weight = Math.exp(-(dx*dx + dy*dy) / (2 * radius * radius));
-                                r += data[ni] * weight;
-                                g += data[ni+1] * weight;
-                                b += data[ni+2] * weight;
-                                count += weight;
-                            }
-                        }
-                    }
-                    
-                    // Apply softened values
-                    data[i] = data[i] * (1 - strength) + (r / count) * strength;
-                    data[i+1] = data[i+1] * (1 - strength) + (g / count) * strength;
-                    data[i+2] = data[i+2] * (1 - strength) + (b / count) * strength;
-                }
-            }
-        }
-
-        // Advanced nose enhancement function
-        function applyNoseEnhancement(data, width, height, strength) {
-            const centerX = width / 2;
-            const centerY = height / 2;
-            const radius = Math.min(width, height) * 0.15;
-            
-            for (let y = 0; y < height; y++) {
-                for (let x = 0; x < width; x++) {
-                    const dx = x - centerX;
-                    const dy = y - centerY;
-                    const distance = Math.sqrt(dx*dx + dy*dy);
-                    
-                    if (distance < radius) {
-                        const i = (y * width + x) * 4;
-                        const factor = 1 - (distance / radius) * strength;
-                        
-                        // Enhance brightness and contrast
-                        data[i] = Math.min(255, data[i] * (1 + factor * 0.1));
-                        data[i+1] = Math.min(255, data[i+1] * (1 + factor * 0.1));
-                        data[i+2] = Math.min(255, data[i+2] * (1 + factor * 0.1));
-                    }
-                }
-            }
-        }
-
-        // Advanced nose bridge modification function
-        function applyNoseBridgeModification(data, width, height, centerX, centerY, radius, strength) {
-            // Create a temporary canvas for the modification
-            const tempCanvas = document.createElement('canvas');
-            tempCanvas.width = width;
-            tempCanvas.height = height;
-            const tempCtx = tempCanvas.getContext('2d');
-            tempCtx.putImageData(new ImageData(new Uint8ClampedArray(data), width, height), 0, 0);
-            
-            // Calculate nose bridge points with more precise positioning
-            const bridgePoints = [];
-            const numPoints = 6;
-            for (let i = 0; i < numPoints; i++) {
-                const y = centerY - radius + (i * radius * 2 / (numPoints - 1));
-                const x = centerX;
-                bridgePoints.push({x, y});
-            }
-            
-            // Apply very conservative bridge modification
-            for (let y = 0; y < height; y++) {
-                for (let x = 0; x < width; x++) {
-                    const dx = x - centerX;
-                    const dy = y - centerY;
-                    const distance = Math.sqrt(dx*dx + dy*dy);
-                    
-                    if (distance < radius) {
-                        const i = (y * width + x) * 4;
-                        // Use cubic falloff for smoother transition
-                        const factor = Math.pow(1 - (distance / radius), 3) * strength * 0.3;
-                        
-                        // Calculate minimal displacement
-                        let shiftX = 0;
-                        let shiftY = 0;
-                        
-                        // Find closest bridge point
-                        let minDist = Infinity;
-                        let closestPoint = null;
-                        for (const point of bridgePoints) {
-                            const dist = Math.sqrt(Math.pow(x - point.x, 2) + Math.pow(y - point.y, 2));
-                            if (dist < minDist) {
-                                minDist = dist;
-                                closestPoint = point;
-                            }
-                        }
-                        
-                        if (closestPoint) {
-                            // Calculate vertical shift based on position
-                            const verticalProgress = (y - (centerY - radius)) / (radius * 2);
-                            shiftY = Math.sin(verticalProgress * Math.PI) * strength * 0.8;
-                            
-                            // Calculate horizontal shift
-                            const horizontalOffset = x - closestPoint.x;
-                            shiftX = Math.sin(horizontalOffset / radius * Math.PI) * strength * 0.5;
-                        }
-                        
-                        // Apply the shifts with minimal intensity
-                        const targetX = Math.round(x + shiftX * 0.3);
-                        const targetY = Math.round(y + shiftY * 0.3);
-                        
-                        if (targetX >= 0 && targetX < width && targetY >= 0 && targetY < height) {
-                            const targetI = (targetY * width + targetX) * 4;
-                            const blendFactor = Math.min(0.5, factor);
-                            
-                            // Preserve original pixel values more
-                            data[targetI] = data[i] * (1 - blendFactor * 0.7) + data[targetI] * (blendFactor * 0.7);
-                            data[targetI+1] = data[i+1] * (1 - blendFactor * 0.7) + data[targetI+1] * (blendFactor * 0.7);
-                            data[targetI+2] = data[i+2] * (1 - blendFactor * 0.7) + data[targetI+2] * (blendFactor * 0.7);
-                        }
-                    }
-                }
-            }
-        }
-
-        // Advanced nose tip enhancement function
-        function applyNoseTipEnhancement(data, width, height, tipX, tipY, radius, strength) {
-            // Create a temporary canvas for the modification
-            const tempCanvas = document.createElement('canvas');
-            tempCanvas.width = width;
-            tempCanvas.height = height;
-            const tempCtx = tempCanvas.getContext('2d');
-            tempCtx.putImageData(new ImageData(new Uint8ClampedArray(data), width, height), 0, 0);
-            
-            // Calculate tip points with more precise positioning
-            const tipPoints = [];
-            const numPoints = 4;
-            for (let i = 0; i < numPoints; i++) {
-                const angle = (i / numPoints) * Math.PI * 2;
-                const x = tipX + Math.cos(angle) * radius * 0.3;
-                const y = tipY + Math.sin(angle) * radius * 0.3;
-                tipPoints.push({x, y});
-            }
-            
-            // Apply very conservative tip enhancement
-            for (let y = 0; y < height; y++) {
-                for (let x = 0; x < width; x++) {
-                    const dx = x - tipX;
-                    const dy = y - tipY;
-                    const distance = Math.sqrt(dx*dx + dy*dy);
-                    
-                    if (distance < radius) {
-                        const i = (y * width + x) * 4;
-                        // Use cubic falloff for smoother transition
-                        const factor = Math.pow(1 - (distance / radius), 3) * strength * 0.3;
-                        
-                        // Calculate minimal enhancement
-                        let enhancement = 1;
-                        let highlight = 1;
-                        
-                        // Find closest tip point
-                        let minDist = Infinity;
-                        let closestPoint = null;
-                        for (const point of tipPoints) {
-                            const dist = Math.sqrt(Math.pow(x - point.x, 2) + Math.pow(y - point.y, 2));
-                            if (dist < minDist) {
-                                minDist = dist;
-                                closestPoint = point;
-                            }
-                        }
-                        
-                        if (closestPoint) {
-                            // Calculate vertical position
-                            const verticalProgress = (y - (tipY - radius)) / (radius * 2);
-                            
-                            // Apply very gentle enhancement near the tip
-                            if (verticalProgress > 0.7) {
-                                enhancement = 1 + factor * 0.05;
-                                highlight = 1 + factor * 0.08;
-                            } else {
-                                enhancement = 1 + factor * 0.03;
-                                highlight = 1 + factor * 0.05;
-                            }
-                            
-                            // Add very subtle lift effect
-                            if (verticalProgress > 0.8) {
-                                const liftFactor = (verticalProgress - 0.8) * 1;
-                                enhancement *= (1 + liftFactor * strength * 0.3);
-                            }
-                        }
-                        
-                        // Apply the enhancements with minimal intensity
-                        data[i] = Math.min(255, data[i] * enhancement);
-                        data[i+1] = Math.min(255, data[i+1] * enhancement);
-                        data[i+2] = Math.min(255, data[i+2] * enhancement);
-                        
-                        // Add very subtle highlight
-                        if (distance < radius * 0.4) {
-                            data[i] = Math.min(255, data[i] * highlight);
-                            data[i+1] = Math.min(255, data[i+1] * highlight);
-                            data[i+2] = Math.min(255, data[i+2] * highlight);
-                        }
-                    }
-                }
-            }
-        }
-
-        // Advanced nose width modification function
-        function applyNoseWidthModification(data, width, height, centerX, centerY, radius, strength) {
-            for (let y = 0; y < height; y++) {
-                for (let x = 0; x < width; x++) {
-                    const dx = x - centerX;
-                    const dy = y - centerY;
-                    const distance = Math.sqrt(dx*dx + dy*dy);
-                    
-                    if (distance < radius) {
-                        const i = (y * width + x) * 4;
-                        const factor = 1 - (distance / radius) * strength;
-                        
-                        // Apply sophisticated width modification
-                        const shift = Math.sin(dx / radius * Math.PI) * strength * 3;
-                        const targetX = x + shift;
-                        
-                        if (targetX >= 0 && targetX < width) {
-                            const targetI = (y * width + Math.round(targetX)) * 4;
-                            data[targetI] = data[i] * (1 - factor) + data[targetI] * factor;
-                            data[targetI+1] = data[i+1] * (1 - factor) + data[targetI+1] * factor;
-                            data[targetI+2] = data[i+2] * (1 - factor) + data[targetI+2] * factor;
-                        }
-                    }
-                }
-            }
-        }
-
-        // Advanced nose straightening function
-        function applyNoseStraightening(data, width, height, centerX, centerY, radius, strength) {
-            // Create a temporary canvas for the modification
-            const tempCanvas = document.createElement('canvas');
-            tempCanvas.width = width;
-            tempCanvas.height = height;
-            const tempCtx = tempCanvas.getContext('2d');
-            tempCtx.putImageData(new ImageData(new Uint8ClampedArray(data), width, height), 0, 0);
-            
-            // Calculate nose line points with more precise positioning
-            const nosePoints = [];
-            const numPoints = 8;
-            for (let i = 0; i < numPoints; i++) {
-                const y = centerY - radius + (i * radius * 2 / (numPoints - 1));
-                const x = centerX;
-                nosePoints.push({x, y});
-            }
-            
-            // Apply very conservative straightening
-            for (let y = 0; y < height; y++) {
-                for (let x = 0; x < width; x++) {
-                    const dx = x - centerX;
-                    const dy = y - centerY;
-                    const distance = Math.sqrt(dx*dx + dy*dy);
-                    
-                    if (distance < radius) {
-                        const i = (y * width + x) * 4;
-                        // Use cubic falloff for smoother transition
-                        const factor = Math.pow(1 - (distance / radius), 3) * strength * 0.3;
-                        
-                        // Find closest nose point
-                        let minDist = Infinity;
-                        let closestPoint = null;
-                        for (const point of nosePoints) {
-                            const dist = Math.sqrt(Math.pow(x - point.x, 2) + Math.pow(y - point.y, 2));
-                            if (dist < minDist) {
-                                minDist = dist;
-                                closestPoint = point;
-                            }
-                        }
-                        
-                        if (closestPoint) {
-                            // Calculate angle for straightening
-                            const angle = Math.atan2(dy, dx);
-                            const targetAngle = Math.atan2(closestPoint.y - centerY, closestPoint.x - centerX);
-                            const angleDiff = targetAngle - angle;
-                            
-                            // Calculate minimal displacement
-                            const displacement = Math.sin(angleDiff) * distance * strength * 0.3;
-                            const targetX = x + Math.cos(angle) * displacement;
-                            const targetY = y + Math.sin(angle) * displacement;
-                            
-                            if (targetX >= 0 && targetX < width && targetY >= 0 && targetY < height) {
-                                const targetI = (Math.round(targetY) * width + Math.round(targetX)) * 4;
-                                const blendFactor = Math.min(0.5, factor);
-                                
-                                // Preserve original pixel values more
-                                data[targetI] = data[i] * (1 - blendFactor * 0.7) + data[targetI] * (blendFactor * 0.7);
-                                data[targetI+1] = data[i+1] * (1 - blendFactor * 0.7) + data[targetI+1] * (blendFactor * 0.7);
-                                data[targetI+2] = data[i+2] * (1 - blendFactor * 0.7) + data[targetI+2] * (blendFactor * 0.7);
-                            }
-                        }
-                    }
-                }
-            }
-        }
-
-        // Enhanced color correction function
-        function applyColorCorrection(data, width, height) {
-            // Calculate average skin tone
-            let totalR = 0, totalG = 0, totalB = 0, count = 0;
-            for (let i = 0; i < data.length; i += 4) {
-                const r = data[i];
-                const g = data[i+1];
-                const b = data[i+2];
-                
-                // Check if pixel is likely skin
-                if (r > 60 && g > 40 && b > 20 && Math.abs(r - g) < 30) {
-                    totalR += r;
-                    totalG += g;
-                    totalB += b;
-                    count++;
-                }
-            }
-            
-            if (count > 0) {
-                const avgR = totalR / count;
-                const avgG = totalG / count;
-                const avgB = totalB / count;
-                
-                // Calculate skin tone adjustment factors with reduced intensity
-                const targetR = 220;
-                const targetG = 180;
-                const targetB = 140;
-                
-                const rFactor = 1 + (targetR - avgR) / avgR * 0.3;
-                const gFactor = 1 + (targetG - avgG) / avgG * 0.3;
-                const bFactor = 1 + (targetB - avgB) / avgB * 0.3;
-                
-                // Apply gentle color correction
-                for (let i = 0; i < data.length; i += 4) {
-                    const r = data[i];
-                    const g = data[i+1];
-                    const b = data[i+2];
-                    
-                    // Check if pixel is likely skin
-                    if (r > 60 && g > 40 && b > 20 && Math.abs(r - g) < 30) {
-                        data[i] = Math.min(255, r * rFactor);
-                        data[i+1] = Math.min(255, g * gFactor);
-                        data[i+2] = Math.min(255, b * bFactor);
-                    }
-                }
-            }
-            
-            // Enhance contrast with reduced intensity
-            const contrast = 1.08;
-            const brightness = 1.03;
-            
-            for (let i = 0; i < data.length; i += 4) {
-                const r = data[i];
-                const g = data[i+1];
-                const b = data[i+2];
-                
-                // Apply gentle contrast and brightness
-                data[i] = Math.min(255, Math.max(0, (r - 128) * contrast + 128) * brightness);
-                data[i+1] = Math.min(255, Math.max(0, (g - 128) * contrast + 128) * brightness);
-                data[i+2] = Math.min(255, Math.max(0, (b - 128) * contrast + 128) * brightness);
-            }
         }
 
         // Handle reset
@@ -935,6 +622,9 @@
             try {
                 // Reset to original image
                 if (originalImage) {
+                    // Clear all FaceMorph effects
+                    FaceMorph.clear();
+                    
                     document.getElementById('result-image').src = originalImage;
                     document.getElementById('result-container').style.display = 'block';
                     document.getElementById('download-btn').href = originalImage;
