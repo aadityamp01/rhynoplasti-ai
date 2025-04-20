@@ -605,15 +605,6 @@ def main():
         # Display the AR simulation
         st.components.v1.html(get_ar_html(), height=600)
         
-        # Instructions
-        st.markdown("""
-        ### How to use the AR Simulation:
-        1. Click the "Start Camera" button to begin
-        2. Allow camera access when prompted
-        3. Choose a rhinoplasty effect from the dropdown
-        4. Adjust the intensity slider to control the effect strength
-        5. Click "Capture" to save the result
-        """)
 
 if __name__ == "__main__":
     main() 

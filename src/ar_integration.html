@@ -23,10 +23,14 @@
             margin: 0 auto;
             padding: 20px;
             box-sizing: border-box;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
         }
         .header {
             text-align: center;
             margin-bottom: 20px;
+            width: 100%;
         }
         .header h1 {
             color: #2c3e50;
@@ -57,6 +61,7 @@
             visibility: visible !important;
             opacity: 1 !important;
             flex-wrap: wrap;
+            width: 100%;
         }
         #permission-message {
             display: none;
@@ -67,6 +72,7 @@
             background-color: #fff;
             border-radius: 4px;
             box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            width: 100%;
         }
         .effect-buttons {
             display: flex;
@@ -77,6 +83,7 @@
             visibility: visible !important;
             opacity: 1 !important;
             padding: 0 10px;
+            width: 100%;
         }
         button {
             padding: 8px 16px;
@@ -103,12 +110,16 @@
             max-width: 640px;
             margin-left: auto;
             margin-right: auto;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
         }
         .result-image {
             max-width: 100%;
             height: auto;
             border-radius: 10px;
             box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
         }
         .download-btn {
             display: inline-block;
@@ -149,6 +160,7 @@
         .effect-instructions ul {
             margin: 10px 0;
             padding-left: 20px;
+            list-style-type: none;
         }
         .effect-instructions li {
             margin: 5px 0;
@@ -229,7 +241,6 @@
 <body>
     <div class="container">
         <div class="header">
-            <h1>Rhinoplasty AI Simulator</h1>
             <p>Experience how you might look after rhinoplasty using advanced AI technology</p>
         </div>
         
@@ -252,7 +263,7 @@
         <!-- Effect instructions -->
         <div id="effect-instructions" class="effect-instructions" style="display: none;">
             <p>Choose an effect to apply to your image:</p>
-            <ul style="text-align: left; display: inline-block;">
+            <ul>
                 <li><strong>Natural Refinement:</strong> Subtle brightness and contrast adjustments</li>
                 <li><strong>Bridge Reduction:</strong> Simulates a smaller nose bridge</li>
                 <li><strong>Tip Refinement:</strong> Brightens and lifts the nose tip</li>
