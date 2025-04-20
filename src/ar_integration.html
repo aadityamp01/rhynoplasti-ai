@@ -164,6 +164,8 @@
         let player = null;
         let capture = null;
         let currentEffect = null;
+        let originalImage = null;
+        let isProcessing = false;
         
         // Get the token from the global variable
         const clientToken = window.BANUBA_CLIENT_TOKEN;
@@ -195,6 +197,10 @@
                 
                 // Render to DOM
                 Dom.render(player, "#webar-app");
+                
+                // Show the controls
+                document.querySelector('.effect-buttons').style.display = 'flex';
+                document.querySelector('.controls').style.display = 'flex';
                 
                 console.log('Banuba WebAR initialized successfully');
                 return true;
@@ -231,6 +237,10 @@
                 player.dispose();
                 player = null;
             }
+            
+            // Hide the controls until an image is loaded
+            document.querySelector('.effect-buttons').style.display = 'none';
+            document.querySelector('.controls').style.display = 'none';
         });
 
         // Image upload handling
@@ -250,6 +260,13 @@
                 
                 // Load the image
                 await player.loadImage(imageUrl);
+                
+                // Store the original image
+                originalImage = imageUrl;
+                
+                // Show the controls
+                document.querySelector('.effect-buttons').style.display = 'flex';
+                document.querySelector('.controls').style.display = 'flex';
             }
         });
 
@@ -265,14 +282,17 @@
 
         Object.keys(effects).forEach(effectId => {
             document.getElementById(effectId).addEventListener('click', async () => {
-                if (player) {
+                if (player && !isProcessing) {
                     try {
+                        isProcessing = true;
                         // Apply the effect using our custom processing
                         const effectType = effects[effectId];
                         await applyCustomEffect(effectType);
                         console.log(`Applied effect: ${effectType}`);
+                        isProcessing = false;
                     } catch (error) {
                         console.error(`Failed to apply effect ${effectType}:`, error);
+                        isProcessing = false;
                     }
                 }
             });
@@ -300,39 +320,51 @@
                     const landmarks = await player.getFaceLandmarks();
                     
                     if (landmarks) {
-                        // Apply our custom effect based on the type
-                        switch (effectType) {
-                            case 'natural':
-                                applyNaturalRefinement(ctx, landmarks);
-                                break;
-                            case 'bridge':
-                                applyBridgeReduction(ctx, landmarks);
-                                break;
-                            case 'tip':
-                                applyTipRefinement(ctx, landmarks);
-                                break;
-                            case 'narrow':
-                                applyNoseNarrowing(ctx, landmarks);
-                                break;
-                            case 'straight':
-                                applyCrookedCorrection(ctx, landmarks);
-                                break;
-                            case 'combined':
-                                applyCombinedEnhancement(ctx, landmarks);
-                                break;
-                        }
+                        // Get nose points
+                        const nosePoints = getNosePoints(landmarks);
                         
-                        // Update the display with the processed image
-                        const processedImage = canvas.toDataURL('image/png');
-                        document.getElementById('result-image').src = processedImage;
-                        document.getElementById('result-container').style.display = 'block';
-                        document.getElementById('download-btn').href = processedImage;
+                        if (nosePoints.length > 0) {
+                            // Apply our custom effect based on the type
+                            switch (effectType) {
+                                case 'natural':
+                                    applyNaturalRefinement(ctx, nosePoints);
+                                    break;
+                                case 'bridge':
+                                    applyBridgeReduction(ctx, nosePoints);
+                                    break;
+                                case 'tip':
+                                    applyTipRefinement(ctx, nosePoints);
+                                    break;
+                                case 'narrow':
+                                    applyNoseNarrowing(ctx, nosePoints);
+                                    break;
+                                case 'straight':
+                                    applyCrookedCorrection(ctx, nosePoints);
+                                    break;
+                                case 'combined':
+                                    applyCombinedEnhancement(ctx, nosePoints);
+                                    break;
+                            }
+                            
+                            // Update the display with the processed image
+                            const processedImage = canvas.toDataURL('image/png');
+                            document.getElementById('result-image').src = processedImage;
+                            document.getElementById('result-container').style.display = 'block';
+                            document.getElementById('download-btn').href = processedImage;
+                        } else {
+                            console.error('No nose points detected');
+                            alert('Could not detect nose points in the image. Please try another photo or adjust your position.');
+                        }
+                    } else {
+                        console.error('No face landmarks detected');
+                        alert('No face detected in the image. Please try another photo.');
                     }
                 };
                 
                 img.src = frame;
             } catch (error) {
                 console.error('Error applying custom effect:', error);
+                alert('Error applying effect: ' + error.message);
             }
         }
 
@@ -348,6 +380,7 @@
                     document.getElementById('download-btn').href = photo;
                 } catch (error) {
                     console.error('Failed to capture image:', error);
+                    alert('Failed to capture image: ' + error.message);
                 }
             }
         });
@@ -356,13 +389,17 @@
             if (player) {
                 try {
                     // Reset to original image
-                    const originalImage = document.getElementById('result-image').src;
                     if (originalImage) {
                         await player.loadImage(originalImage);
+                        document.getElementById('result-container').style.display = 'none';
+                        console.log('Reset to original image');
+                    } else {
+                        // If no original image, just hide the result
+                        document.getElementById('result-container').style.display = 'none';
                     }
-                    console.log('Reset to original image');
                 } catch (error) {
                     console.error('Failed to reset image:', error);
+                    alert('Failed to reset image: ' + error.message);
                 }
             }
         });
@@ -503,12 +540,29 @@
         }
 
         function getNosePoints(landmarks) {
-            // Convert landmarks to nose points
-            // This is a simplified version - you'll need to adjust based on actual landmark indices
-            return landmarks.filter((_, i) => i >= 27 && i <= 33).map(l => ({
-                x: l.x * ctx.canvas.width,
-                y: l.y * ctx.canvas.height
-            }));
+            // Check if we have enough landmarks
+            if (!landmarks || landmarks.length < 34) {
+                console.error('Not enough landmarks detected');
+                return [];
+            }
+            
+            try {
+                // Convert landmarks to nose points
+                // Using a more comprehensive set of nose landmarks
+                const noseIndices = [27, 28, 29, 30, 31, 32, 33, 34, 35, 36];
+                return noseIndices.map(i => {
+                    if (i < landmarks.length) {
+                        return {
+                            x: landmarks[i].x * ctx.canvas.width,
+                            y: landmarks[i].y * ctx.canvas.height
+                        };
+                    }
+                    return null;
+                }).filter(point => point !== null);
+            } catch (error) {
+                console.error('Error processing nose points:', error);
+                return [];
+            }
         }
 
         // Initialize on page load

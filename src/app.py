@@ -12,6 +12,7 @@ import json
 import requests
 from pathlib import Path
 from io import BytesIO
+import math
 
 # Set page config
 st.set_page_config(
@@ -342,25 +343,42 @@ def apply_nose_narrowing(image, mask, landmarks, intensity):
 
 def apply_crooked_correction(image, mask, landmarks, intensity):
     """Correct crooked nose by straightening the bridge."""
-    # Get bridge landmarks
-    bridge_top = landmarks[27]
-    bridge_bottom = landmarks[30]
+    # Check if we have enough landmarks
+    if len(landmarks) < 31:
+        print("Warning: Not enough landmarks detected for crooked nose correction")
+        return image
     
-    # Calculate angle to straighten
-    dx = bridge_bottom[0] - bridge_top[0]
-    dy = bridge_bottom[1] - bridge_top[1]
-    angle = np.arctan2(dx, dy) * 180 / np.pi
-    
-    # Create rotation matrix
-    height, width = image.shape[:2]
-    center = (bridge_top[0], bridge_top[1])
-    M = cv2.getRotationMatrix2D(center, -angle * intensity, 1.0)
-    
-    # Apply rotation
-    result = cv2.warpAffine(image, M, (width, height))
-    
-    # Blend with original
-    return cv2.addWeighted(image, 1 - intensity, result, intensity, 0)
+    try:
+        # Get bridge landmarks
+        bridge_top = landmarks[27]
+        bridge_bottom = landmarks[30]
+        
+        # Calculate angle to straighten
+        dx = bridge_bottom[0] - bridge_top[0]
+        dy = bridge_bottom[1] - bridge_top[1]
+        angle = math.atan2(dx, dy)
+        
+        # Create a mask for the bridge area
+        bridge_mask = np.zeros_like(mask)
+        cv2.line(bridge_mask, bridge_top, bridge_bottom, 255, 10)
+        
+        # Apply rotation to straighten
+        height, width = image.shape[:2]
+        center = (bridge_top[0], bridge_top[1])
+        rotation_matrix = cv2.getRotationMatrix2D(center, -angle * 180 / math.pi, 1.0)
+        
+        # Apply the rotation only to the bridge area
+        rotated = cv2.warpAffine(image, rotation_matrix, (width, height))
+        result = image.copy()
+        result[bridge_mask > 0] = rotated[bridge_mask > 0]
+        
+        # Blend with original based on intensity
+        result = cv2.addWeighted(image, 1 - intensity, result, intensity, 0)
+        
+        return result
+    except Exception as e:
+        print(f"Error in crooked nose correction: {e}")
+        return image
 
 def apply_combined_enhancement(image, mask, landmarks, intensity):
     """Apply a combination of all enhancements."""
@@ -482,7 +500,7 @@ def main():
         if uploaded_file is not None:
             # Display the uploaded image
             image = Image.open(uploaded_file)
-            st.image(image, caption="Uploaded Image", use_column_width=True)
+            st.image(image, caption="Uploaded Image", use_container_width=True)
             
             # Rhinoplasty options
             st.subheader("Choose Rhinoplasty Option")
@@ -501,7 +519,7 @@ def main():
                     result = process_image(image, option, intensity)
                     
                     # Display the result
-                    st.image(result, caption="Simulated Result", use_column_width=True)
+                    st.image(result, caption="Rhinoplasty Result", use_container_width=True)
                     
                     # Add download button
                     buf = BytesIO()
