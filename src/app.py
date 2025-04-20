@@ -147,32 +147,6 @@ def get_ar_html():
         f'<!-- AR Integration -->\n{token_script}'
     )
     
-    # Check if effect files exist and update paths if needed
-    effects_dir = Path(__file__).parent / "effects"
-    if not effects_dir.exists():
-        effects_dir.mkdir(exist_ok=True)
-    
-    # List of required effect files
-    effect_files = [
-        "rhinoplasty.zip",
-        "natural_refinement.zip",
-        "bridge_reduction.zip",
-        "tip_refinement.zip",
-        "nose_narrowing.zip",
-        "crooked_correction.zip",
-        "combined_enhancement.zip"
-    ]
-    
-    # Check if effect files exist and update paths
-    for effect_file in effect_files:
-        effect_path = effects_dir / effect_file
-        if effect_path.exists():
-            # Replace the CDN path with the local path
-            html_content = html_content.replace(
-                f'new Effect("{effect_file}")', 
-                f'new Effect("{effect_path.as_posix()}")'
-            )
-    
     return html_content
 
 def detect_nose_landmarks(image):

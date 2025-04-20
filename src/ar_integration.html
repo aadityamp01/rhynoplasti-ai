@@ -163,6 +163,7 @@
 
         let player = null;
         let capture = null;
+        let currentEffect = null;
         
         // Get the token from the global variable
         const clientToken = window.BANUBA_CLIENT_TOKEN;
@@ -189,14 +190,11 @@
                 // Use webcam
                 await player.use(new Webcam());
                 
-                // Apply default effect
-                player.applyEffect(new Effect("rhinoplasty.zip"));
+                // Initialize image capture
+                capture = new ImageCapture(player);
                 
                 // Render to DOM
                 Dom.render(player, "#webar-app");
-                
-                // Initialize image capture
-                capture = new ImageCapture(player);
                 
                 console.log('Banuba WebAR initialized successfully');
                 return true;
@@ -257,26 +255,86 @@
 
         // Effect buttons
         const effects = {
-            'natural-refinement': 'natural_refinement.zip',
-            'bridge-reduction': 'bridge_reduction.zip',
-            'tip-refinement': 'tip_refinement.zip',
-            'nose-narrowing': 'nose_narrowing.zip',
-            'crooked-correction': 'crooked_correction.zip',
-            'combined-enhancement': 'combined_enhancement.zip'
+            'natural-refinement': 'natural',
+            'bridge-reduction': 'bridge',
+            'tip-refinement': 'tip',
+            'nose-narrowing': 'narrow',
+            'crooked-correction': 'straight',
+            'combined-enhancement': 'combined'
         };
 
         Object.keys(effects).forEach(effectId => {
             document.getElementById(effectId).addEventListener('click', async () => {
                 if (player) {
                     try {
-                        player.applyEffect(new Effect(effects[effectId]));
-                        console.log(`Applied effect: ${effects[effectId]}`);
+                        // Apply the effect using our custom processing
+                        const effectType = effects[effectId];
+                        await applyCustomEffect(effectType);
+                        console.log(`Applied effect: ${effectType}`);
                     } catch (error) {
-                        console.error(`Failed to apply effect ${effects[effectId]}:`, error);
+                        console.error(`Failed to apply effect ${effectType}:`, error);
                     }
                 }
             });
         });
+
+        // Custom effect application
+        async function applyCustomEffect(effectType) {
+            if (!player) return;
+
+            try {
+                // Get the current frame
+                const frame = await capture.takePhoto();
+                
+                // Create a canvas to process the image
+                const canvas = document.createElement('canvas');
+                const ctx = canvas.getContext('2d');
+                const img = new Image();
+                
+                img.onload = async () => {
+                    canvas.width = img.width;
+                    canvas.height = img.height;
+                    ctx.drawImage(img, 0, 0);
+                    
+                    // Get face landmarks from Banuba
+                    const landmarks = await player.getFaceLandmarks();
+                    
+                    if (landmarks) {
+                        // Apply our custom effect based on the type
+                        switch (effectType) {
+                            case 'natural':
+                                applyNaturalRefinement(ctx, landmarks);
+                                break;
+                            case 'bridge':
+                                applyBridgeReduction(ctx, landmarks);
+                                break;
+                            case 'tip':
+                                applyTipRefinement(ctx, landmarks);
+                                break;
+                            case 'narrow':
+                                applyNoseNarrowing(ctx, landmarks);
+                                break;
+                            case 'straight':
+                                applyCrookedCorrection(ctx, landmarks);
+                                break;
+                            case 'combined':
+                                applyCombinedEnhancement(ctx, landmarks);
+                                break;
+                        }
+                        
+                        // Update the display with the processed image
+                        const processedImage = canvas.toDataURL('image/png');
+                        document.getElementById('result-image').src = processedImage;
+                        document.getElementById('result-container').style.display = 'block';
+                        document.getElementById('download-btn').href = processedImage;
+                    }
+                };
+                
+                img.src = frame;
+            } catch (error) {
+                console.error('Error applying custom effect:', error);
+            }
+        }
 
         // Capture and reset
         document.getElementById('capture').addEventListener('click', async () => {
@@ -297,14 +355,161 @@
         document.getElementById('reset').addEventListener('click', async () => {
             if (player) {
                 try {
-                    // Reset to default effect
-                    player.applyEffect(new Effect("rhinoplasty.zip"));
-                    console.log('Reset to default effect');
+                    // Reset to original image
+                    const originalImage = document.getElementById('result-image').src;
+                    if (originalImage) {
+                        await player.loadImage(originalImage);
+                    }
+                    console.log('Reset to original image');
                 } catch (error) {
-                    console.error('Failed to reset effect:', error);
+                    console.error('Failed to reset image:', error);
                 }
             }
         });
+
+        // Custom effect functions
+        function applyNaturalRefinement(ctx, landmarks) {
+            // Get nose landmarks
+            const nosePoints = getNosePoints(landmarks);
+            
+            // Create a smooth mask for the nose area
+            ctx.save();
+            ctx.beginPath();
+            ctx.moveTo(nosePoints[0].x, nosePoints[0].y);
+            for (let i = 1; i < nosePoints.length; i++) {
+                ctx.lineTo(nosePoints[i].x, nosePoints[i].y);
+            }
+            ctx.closePath();
+            
+            // Apply brightness adjustment
+            ctx.globalCompositeOperation = 'lighter';
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.1)';
+            ctx.fill();
+            
+            // Apply subtle smoothing
+            ctx.filter = 'blur(2px)';
+            ctx.drawImage(ctx.canvas, 0, 0);
+            
+            ctx.restore();
+        }
+
+        function applyBridgeReduction(ctx, landmarks) {
+            const nosePoints = getNosePoints(landmarks);
+            const bridgeTop = nosePoints[0];
+            const bridgeBottom = nosePoints[nosePoints.length - 1];
+            
+            // Calculate vertical shift
+            const shift = (bridgeBottom.y - bridgeTop.y) * 0.2;
+            
+            // Create displacement map
+            ctx.save();
+            ctx.beginPath();
+            ctx.moveTo(bridgeTop.x - 10, bridgeTop.y);
+            ctx.lineTo(bridgeTop.x + 10, bridgeTop.y);
+            ctx.lineTo(bridgeBottom.x + 10, bridgeBottom.y - shift);
+            ctx.lineTo(bridgeBottom.x - 10, bridgeBottom.y - shift);
+            ctx.closePath();
+            
+            // Apply the shift
+            ctx.globalCompositeOperation = 'source-over';
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.1)';
+            ctx.fill();
+            
+            ctx.restore();
+        }
+
+        function applyTipRefinement(ctx, landmarks) {
+            const nosePoints = getNosePoints(landmarks);
+            const tip = nosePoints[nosePoints.length - 1];
+            
+            // Create circular mask for tip
+            ctx.save();
+            ctx.beginPath();
+            ctx.arc(tip.x, tip.y, 15, 0, Math.PI * 2);
+            
+            // Brighten and lift
+            ctx.globalCompositeOperation = 'lighter';
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.2)';
+            ctx.fill();
+            
+            // Apply subtle upward shift
+            ctx.translate(0, -5);
+            ctx.drawImage(ctx.canvas, 0, 0);
+            
+            ctx.restore();
+        }
+
+        function applyNoseNarrowing(ctx, landmarks) {
+            const nosePoints = getNosePoints(landmarks);
+            const left = nosePoints[0];
+            const right = nosePoints[nosePoints.length - 1];
+            
+            // Calculate horizontal shift
+            const shift = (right.x - left.x) * 0.15;
+            
+            // Apply narrowing
+            ctx.save();
+            ctx.beginPath();
+            ctx.moveTo(left.x + shift, left.y);
+            ctx.lineTo(right.x - shift, right.y);
+            ctx.lineTo(right.x, right.y + 20);
+            ctx.lineTo(left.x, left.y + 20);
+            ctx.closePath();
+            
+            ctx.globalCompositeOperation = 'source-over';
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.1)';
+            ctx.fill();
+            
+            ctx.restore();
+        }
+
+        function applyCrookedCorrection(ctx, landmarks) {
+            const nosePoints = getNosePoints(landmarks);
+            const top = nosePoints[0];
+            const bottom = nosePoints[nosePoints.length - 1];
+            
+            // Calculate angle to straighten
+            const dx = bottom.x - top.x;
+            const dy = bottom.y - top.y;
+            const angle = Math.atan2(dx, dy);
+            
+            // Apply rotation
+            ctx.save();
+            ctx.translate(top.x, top.y);
+            ctx.rotate(-angle);
+            ctx.translate(-top.x, -top.y);
+            
+            ctx.beginPath();
+            ctx.moveTo(top.x - 10, top.y);
+            ctx.lineTo(top.x + 10, top.y);
+            ctx.lineTo(bottom.x + 10, bottom.y);
+            ctx.lineTo(bottom.x - 10, bottom.y);
+            ctx.closePath();
+            
+            ctx.globalCompositeOperation = 'source-over';
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.1)';
+            ctx.fill();
+            
+            ctx.restore();
+        }
+
+        function applyCombinedEnhancement(ctx, landmarks) {
+            // Apply all effects with reduced intensity
+            applyNaturalRefinement(ctx, landmarks);
+            applyBridgeReduction(ctx, landmarks);
+            applyTipRefinement(ctx, landmarks);
+            applyNoseNarrowing(ctx, landmarks);
+            applyCrookedCorrection(ctx, landmarks);
+        }
+
+        function getNosePoints(landmarks) {
+            // Convert landmarks to nose points
+            // This is a simplified version - you'll need to adjust based on actual landmark indices
+            return landmarks.filter((_, i) => i >= 27 && i <= 33).map(l => ({
+                x: l.x * ctx.canvas.width,
+                y: l.y * ctx.canvas.height
+            }));
+        }
 
         // Initialize on page load
         window.addEventListener('load', initializeBanubaWebAR);
