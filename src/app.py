@@ -422,35 +422,7 @@ def check_banuba_token():
 
 def check_effect_files():
     """Check if the required effect files exist"""
-    effects_dir = Path(__file__).parent / "effects"
-    if not effects_dir.exists():
-        st.warning("⚠️ Effects directory not found. Creating it now.")
-        effects_dir.mkdir(exist_ok=True)
-        return False
-    
-    # List of required effect files
-    effect_files = [
-        "rhinoplasty.zip",
-        "natural_refinement.zip",
-        "bridge_reduction.zip",
-        "tip_refinement.zip",
-        "nose_narrowing.zip",
-        "crooked_correction.zip",
-        "combined_enhancement.zip"
-    ]
-    
-    # Check if effect files exist
-    missing_files = []
-    for effect_file in effect_files:
-        if not (effects_dir / effect_file).exists():
-            missing_files.append(effect_file)
-    
-    if missing_files:
-        st.warning(f"⚠️ The following effect files are missing: {', '.join(missing_files)}")
-        st.info("Please download the effect files from Banuba and place them in the 'effects' directory.")
-        return False
-    
-    st.success("✅ All required effect files are present")
+    # We no longer need to check for effect files since we're using custom canvas-based effects
     return True
 
 def process_image(image, option, intensity):
