@@ -629,14 +629,14 @@
             
             // Calculate nose bridge points
             const bridgePoints = [];
-            const numPoints = 10;
+            const numPoints = 8;
             for (let i = 0; i < numPoints; i++) {
                 const y = centerY - radius + (i * radius * 2 / (numPoints - 1));
                 const x = centerX;
                 bridgePoints.push({x, y});
             }
             
-            // Apply sophisticated bridge modification
+            // Apply conservative bridge modification
             for (let y = 0; y < height; y++) {
                 for (let x = 0; x < width; x++) {
                     const dx = x - centerX;
@@ -645,9 +645,9 @@
                     
                     if (distance < radius) {
                         const i = (y * width + x) * 4;
-                        const factor = 1 - (distance / radius) * strength;
+                        const factor = Math.pow(1 - (distance / radius), 2) * strength * 0.5;
                         
-                        // Calculate displacement based on position
+                        // Calculate gentle displacement
                         let shiftX = 0;
                         let shiftY = 0;
                         
@@ -665,20 +665,20 @@
                         if (closestPoint) {
                             // Calculate vertical shift based on position
                             const verticalProgress = (y - (centerY - radius)) / (radius * 2);
-                            shiftY = Math.sin(verticalProgress * Math.PI) * strength * 3;
+                            shiftY = Math.sin(verticalProgress * Math.PI) * strength * 1.5;
                             
                             // Calculate horizontal shift
                             const horizontalOffset = x - closestPoint.x;
-                            shiftX = Math.sin(horizontalOffset / radius * Math.PI) * strength * 2;
+                            shiftX = Math.sin(horizontalOffset / radius * Math.PI) * strength;
                         }
                         
-                        // Apply the shifts
-                        const targetX = Math.round(x + shiftX);
-                        const targetY = Math.round(y + shiftY);
+                        // Apply the shifts with reduced intensity
+                        const targetX = Math.round(x + shiftX * 0.5);
+                        const targetY = Math.round(y + shiftY * 0.5);
                         
                         if (targetX >= 0 && targetX < width && targetY >= 0 && targetY < height) {
                             const targetI = (targetY * width + targetX) * 4;
-                            const blendFactor = Math.min(1, factor * 1.5);
+                            const blendFactor = Math.min(0.7, factor);
                             
                             data[targetI] = data[i] * (1 - blendFactor) + data[targetI] * blendFactor;
                             data[targetI+1] = data[i+1] * (1 - blendFactor) + data[targetI+1] * blendFactor;
@@ -700,15 +700,15 @@
             
             // Calculate tip points for better control
             const tipPoints = [];
-            const numPoints = 8;
+            const numPoints = 6;
             for (let i = 0; i < numPoints; i++) {
                 const angle = (i / numPoints) * Math.PI * 2;
-                const x = tipX + Math.cos(angle) * radius * 0.5;
-                const y = tipY + Math.sin(angle) * radius * 0.5;
+                const x = tipX + Math.cos(angle) * radius * 0.4;
+                const y = tipY + Math.sin(angle) * radius * 0.4;
                 tipPoints.push({x, y});
             }
             
-            // Apply sophisticated tip enhancement
+            // Apply conservative tip enhancement
             for (let y = 0; y < height; y++) {
                 for (let x = 0; x < width; x++) {
                     const dx = x - tipX;
@@ -717,9 +717,9 @@
                     
                     if (distance < radius) {
                         const i = (y * width + x) * 4;
-                        const factor = 1 - (distance / radius) * strength;
+                        const factor = Math.pow(1 - (distance / radius), 2) * strength * 0.5;
                         
-                        // Calculate enhancement based on position
+                        // Calculate gentle enhancement
                         let enhancement = 1;
                         let highlight = 1;
                         
@@ -738,28 +738,28 @@
                             // Calculate vertical position
                             const verticalProgress = (y - (tipY - radius)) / (radius * 2);
                             
-                            // Apply stronger enhancement near the tip
+                            // Apply gentler enhancement near the tip
                             if (verticalProgress > 0.7) {
-                                enhancement = 1 + factor * 0.2;
-                                highlight = 1 + factor * 0.3;
-                            } else {
                                 enhancement = 1 + factor * 0.1;
                                 highlight = 1 + factor * 0.15;
+                            } else {
+                                enhancement = 1 + factor * 0.05;
+                                highlight = 1 + factor * 0.08;
                             }
                             
                             // Add subtle lift effect
                             if (verticalProgress > 0.8) {
-                                const liftFactor = (verticalProgress - 0.8) * 5;
-                                enhancement *= (1 + liftFactor * strength);
+                                const liftFactor = (verticalProgress - 0.8) * 2;
+                                enhancement *= (1 + liftFactor * strength * 0.5);
                             }
                         }
                         
-                        // Apply the enhancements
+                        // Apply the enhancements with reduced intensity
                         data[i] = Math.min(255, data[i] * enhancement);
                         data[i+1] = Math.min(255, data[i+1] * enhancement);
                         data[i+2] = Math.min(255, data[i+2] * enhancement);
                         
-                        // Add highlight
+                        // Add subtle highlight
                         if (distance < radius * 0.5) {
                             data[i] = Math.min(255, data[i] * highlight);
                             data[i+1] = Math.min(255, data[i+1] * highlight);
@@ -808,14 +808,14 @@
             
             // Calculate nose line points
             const nosePoints = [];
-            const numPoints = 12;
+            const numPoints = 10;
             for (let i = 0; i < numPoints; i++) {
                 const y = centerY - radius + (i * radius * 2 / (numPoints - 1));
                 const x = centerX;
                 nosePoints.push({x, y});
             }
             
-            // Apply sophisticated straightening
+            // Apply conservative straightening
             for (let y = 0; y < height; y++) {
                 for (let x = 0; x < width; x++) {
                     const dx = x - centerX;
@@ -824,7 +824,7 @@
                     
                     if (distance < radius) {
                         const i = (y * width + x) * 4;
-                        const factor = 1 - (distance / radius) * strength;
+                        const factor = Math.pow(1 - (distance / radius), 2) * strength * 0.5;
                         
                         // Find closest nose point
                         let minDist = Infinity;
@@ -843,14 +843,14 @@
                             const targetAngle = Math.atan2(closestPoint.y - centerY, closestPoint.x - centerX);
                             const angleDiff = targetAngle - angle;
                             
-                            // Calculate displacement
-                            const displacement = Math.sin(angleDiff) * distance * strength;
+                            // Calculate gentle displacement
+                            const displacement = Math.sin(angleDiff) * distance * strength * 0.5;
                             const targetX = x + Math.cos(angle) * displacement;
                             const targetY = y + Math.sin(angle) * displacement;
                             
                             if (targetX >= 0 && targetX < width && targetY >= 0 && targetY < height) {
                                 const targetI = (Math.round(targetY) * width + Math.round(targetX)) * 4;
-                                const blendFactor = Math.min(1, factor * 1.5);
+                                const blendFactor = Math.min(0.7, factor);
                                 
                                 data[targetI] = data[i] * (1 - blendFactor) + data[targetI] * blendFactor;
                                 data[targetI+1] = data[i+1] * (1 - blendFactor) + data[targetI+1] * blendFactor;
@@ -885,16 +885,16 @@
                 const avgG = totalG / count;
                 const avgB = totalB / count;
                 
-                // Calculate skin tone adjustment factors
+                // Calculate skin tone adjustment factors with reduced intensity
                 const targetR = 220;
                 const targetG = 180;
                 const targetB = 140;
                 
-                const rFactor = targetR / avgR;
-                const gFactor = targetG / avgG;
-                const bFactor = targetB / avgB;
+                const rFactor = 1 + (targetR - avgR) / avgR * 0.3;
+                const gFactor = 1 + (targetG - avgG) / avgG * 0.3;
+                const bFactor = 1 + (targetB - avgB) / avgB * 0.3;
                 
-                // Apply color correction
+                // Apply gentle color correction
                 for (let i = 0; i < data.length; i += 4) {
                     const r = data[i];
                     const g = data[i+1];
@@ -909,16 +909,16 @@
                 }
             }
             
-            // Enhance contrast
-            const contrast = 1.15;
-            const brightness = 1.05;
+            // Enhance contrast with reduced intensity
+            const contrast = 1.08;
+            const brightness = 1.03;
             
             for (let i = 0; i < data.length; i += 4) {
                 const r = data[i];
                 const g = data[i+1];
                 const b = data[i+2];
                 
-                // Apply contrast and brightness
+                // Apply gentle contrast and brightness
                 data[i] = Math.min(255, Math.max(0, (r - 128) * contrast + 128) * brightness);
                 data[i+1] = Math.min(255, Math.max(0, (g - 128) * contrast + 128) * brightness);
                 data[i+2] = Math.min(255, Math.max(0, (b - 128) * contrast + 128) * brightness);
