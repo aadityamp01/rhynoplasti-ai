@@ -6,4 +6,8 @@ mediapipe==0.10.8
 google-cloud-aiplatform==1.38.1
 vertexai==0.0.1
 flask==2.3.3
-flask-cors==4.0.0 
+flask-cors==4.0.0
+pygments==2.19.1
+mdurl==0.1.2
+markdown-it-py==3.0.0
+rich==14.0.0 
