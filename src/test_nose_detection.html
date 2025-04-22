@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nose Detection Test</title>
+    <title>Rhinoplasty AI Simulator</title>
     <style>
         body {
             font-family: Arial, sans-serif;
@@ -40,11 +40,23 @@
             margin: 20px 0;
             text-align: center;
         }
-        canvas {
+        .image-container {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 20px;
+            gap: 20px;
+        }
+        .image-box {
+            flex: 1;
+            text-align: center;
+        }
+        .image-box img {
             max-width: 100%;
             border: 1px solid #ddd;
             border-radius: 8px;
-            margin-top: 20px;
+        }
+        .image-box h3 {
+            margin-top: 10px;
         }
         .controls {
             margin: 20px 0;
@@ -66,44 +78,67 @@
             border-radius: 4px;
             background-color: #e9ecef;
         }
+        .loading {
+            display: none;
+            margin: 20px 0;
+            text-align: center;
+        }
+        .loading-spinner {
+            border: 4px solid rgba(0, 0, 0, 0.1);
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            border-left-color: #007bff;
+            animation: spin 1s linear infinite;
+            margin: 0 auto;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
     </style>
 </head>
 <body>
     <div class="container">
-        <h1>Nose Detection Test</h1>
-        <p>Upload an image to test nose detection accuracy</p>
+        <h1>Rhinoplasty AI Simulator</h1>
+        <p>Upload a photo to see how you might look after rhinoplasty</p>
         
         <div class="upload-container">
             <div class="upload-btn" id="upload-btn">Upload Image</div>
             <input type="file" id="image-upload" accept="image/*" style="display: none;">
         </div>
         
-        <div class="status" id="status">Ready to test</div>
+        <div class="status" id="status">Ready to process</div>
         
-        <div class="result-container">
-            <canvas id="canvas"></canvas>
+        <div class="loading" id="loading">
+            <div class="loading-spinner"></div>
+            <p>Processing your image with AI...</p>
         </div>
         
-        <div class="controls">
-            <button id="detect-btn">Detect Nose</button>
-            <button id="reset-btn">Reset</button>
+        <div class="result-container" id="result-container" style="display: none;">
+            <div class="image-container">
+                <div class="image-box">
+                    <h3>Original Image</h3>
+                    <img id="original-image" src="" alt="Original Image">
+                </div>
+                <div class="image-box">
+                    <h3>Rhinoplasty Result</h3>
+                    <img id="result-image" src="" alt="Rhinoplasty Result">
+                </div>
+            </div>
+            <div class="controls">
+                <button id="download-btn">Download Result</button>
+                <button id="reset-btn">Reset</button>
+            </div>
         </div>
     </div>
 
-    <!-- Face-API.js for face detection and landmark detection -->
-    <script src="https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/dist/face-api.min.js"></script>
-    
     <script>
-        let canvas = null;
-        let ctx = null;
         let originalImage = null;
+        let resultImage = null;
         
         // Initialize on page load
-        window.addEventListener('load', async () => {
-            // Initialize canvas
-            canvas = document.getElementById('canvas');
-            ctx = canvas.getContext('2d');
-            
+        window.addEventListener('load', () => {
             // Set up upload button
             document.getElementById('upload-btn').addEventListener('click', () => {
                 document.getElementById('image-upload').click();
@@ -112,25 +147,11 @@
             // Set up image upload handling
             document.getElementById('image-upload').addEventListener('change', handleImageUpload);
             
-            // Set up detect button
-            document.getElementById('detect-btn').addEventListener('click', detectNose);
+            // Set up download button
+            document.getElementById('download-btn').addEventListener('click', downloadResult);
             
             // Set up reset button
-            document.getElementById('reset-btn').addEventListener('click', resetCanvas);
-            
-            // Load face-api models
-            try {
-                document.getElementById('status').textContent = 'Loading face detection models...';
-                await Promise.all([
-                    faceapi.nets.tinyFaceDetector.loadFromUri('/models'),
-                    faceapi.nets.faceLandmark68Net.loadFromUri('/models')
-                ]);
-                document.getElementById('status').textContent = 'Models loaded successfully. Ready to test.';
-                console.log('Face detection models loaded');
-            } catch (error) {
-                document.getElementById('status').textContent = 'Error loading models: ' + error.message;
-                console.error('Failed to load face detection models:', error);
-            }
+            document.getElementById('reset-btn').addEventListener('click', resetApp);
         });
         
         // Handle image upload
@@ -145,18 +166,18 @@
                     // Create an image element to load the file
                     const img = new Image();
                     img.onload = () => {
-                        // Set canvas dimensions to match the image
-                        canvas.width = img.width;
-                        canvas.height = img.height;
-                        
-                        // Draw the image on the canvas
-                        ctx.drawImage(img, 0, 0);
-                        
                         // Store the original image
                         originalImage = img;
                         
-                        document.getElementById('status').textContent = 'Image loaded. Click "Detect Nose" to test detection.';
-                        console.log('Image loaded, dimensions:', img.width, 'x', img.height);
+                        // Display the original image
+                        document.getElementById('original-image').src = imageUrl;
+                        
+                        // Show loading indicator
+                        document.getElementById('loading').style.display = 'block';
+                        document.getElementById('status').textContent = 'Processing image with AI...';
+                        
+                        // Process the image with Vertex AI
+                        processImageWithVertexAI(imageUrl);
                     };
                     
                     img.src = imageUrl;
@@ -167,71 +188,88 @@
             }
         }
         
-        // Detect nose
-        async function detectNose() {
-            if (!originalImage) {
-                document.getElementById('status').textContent = 'Please upload an image first.';
-                return;
-            }
-            
+        // Process image with Vertex AI
+        async function processImageWithVertexAI(imageUrl) {
             try {
-                document.getElementById('status').textContent = 'Detecting face and nose...';
+                // Convert image to base64
+                const base64Image = await getBase64FromUrl(imageUrl);
                 
-                // Detect face
-                const detections = await faceapi.detectAllFaces(canvas, new faceapi.TinyFaceDetectorOptions())
-                    .withFaceLandmarks();
+                // Call the backend API to process with Vertex AI
+                const response = await fetch('/api/process-image', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        image: base64Image,
+                        prompt: "Apply rhinoplasty to this face while maintaining the overall face structure. Make the nose more refined, slightly smaller, and more proportional to the face. Keep the person's identity intact."
+                    }),
+                });
                 
-                if (detections && detections.length > 0) {
-                    // Draw the original image
-                    ctx.drawImage(originalImage, 0, 0);
-                    
-                    // Draw face landmarks
-                    faceapi.draw.drawFaceLandmarks(canvas, detections);
-                    
-                    // Highlight nose points
-                    const nosePoints = detections[0].landmarks.getNose();
-                    ctx.fillStyle = 'rgba(255, 0, 0, 0.5)';
-                    nosePoints.forEach(point => {
-                        ctx.beginPath();
-                        ctx.arc(point.x, point.y, 3, 0, 2 * Math.PI);
-                        ctx.fill();
-                    });
-                    
-                    // Draw nose region
-                    const noseTop = nosePoints[0];
-                    const noseBottom = nosePoints[6];
-                    const noseLeft = nosePoints[3];
-                    const noseRight = nosePoints[4];
-                    
-                    ctx.strokeStyle = 'rgba(0, 255, 0, 0.8)';
-                    ctx.lineWidth = 2;
-                    ctx.strokeRect(
-                        noseLeft.x - 10,
-                        noseTop.y - 10,
-                        noseRight.x - noseLeft.x + 20,
-                        noseBottom.y - noseTop.y + 20
-                    );
-                    
-                    document.getElementById('status').textContent = 'Nose detected successfully!';
-                    console.log('Nose detected:', nosePoints);
-                } else {
-                    document.getElementById('status').textContent = 'No face detected in the image.';
-                    console.warn('No face detected in the image');
+                if (!response.ok) {
+                    throw new Error(`API error: ${response.status}`);
                 }
+                
+                const data = await response.json();
+                
+                // Display the result
+                document.getElementById('result-image').src = data.resultImage;
+                resultImage = data.resultImage;
+                
+                // Hide loading indicator
+                document.getElementById('loading').style.display = 'none';
+                
+                // Show result container
+                document.getElementById('result-container').style.display = 'block';
+                
+                document.getElementById('status').textContent = 'Rhinoplasty simulation complete!';
             } catch (error) {
-                document.getElementById('status').textContent = 'Error detecting nose: ' + error.message;
-                console.error('Error detecting nose:', error);
+                document.getElementById('loading').style.display = 'none';
+                document.getElementById('status').textContent = 'Error processing image: ' + error.message;
+                console.error('Error processing image:', error);
             }
         }
         
-        // Reset canvas
-        function resetCanvas() {
-            if (originalImage) {
-                ctx.drawImage(originalImage, 0, 0);
-                document.getElementById('status').textContent = 'Canvas reset.';
-            } else {
-                document.getElementById('status').textContent = 'No image to reset.';
+        // Convert image URL to base64
+        function getBase64FromUrl(url) {
+            return new Promise((resolve, reject) => {
+                const img = new Image();
+                img.crossOrigin = 'anonymous';
+                img.onload = () => {
+                    const canvas = document.createElement('canvas');
+                    canvas.width = img.width;
+                    canvas.height = img.height;
+                    const ctx = canvas.getContext('2d');
+                    ctx.drawImage(img, 0, 0);
+                    const dataURL = canvas.toDataURL('image/jpeg');
+                    resolve(dataURL.split(',')[1]);
+                };
+                img.onerror = reject;
+                img.src = url;
+            });
+        }
+        
+        // Download result
+        function downloadResult() {
+            if (resultImage) {
+                const link = document.createElement('a');
+                link.href = resultImage;
+                link.download = 'rhinoplasty-result.jpg';
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
             }
+        }
+        
+        // Reset app
+        function resetApp() {
+            document.getElementById('image-upload').value = '';
+            document.getElementById('original-image').src = '';
+            document.getElementById('result-image').src = '';
+            document.getElementById('result-container').style.display = 'none';
+            document.getElementById('status').textContent = 'Ready to process';
+            originalImage = null;
+            resultImage = null;
         }
     </script>
 </body>

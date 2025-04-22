@@ -16,9 +16,8 @@ api_bp = Blueprint('api', __name__)
 
 def init_vertex_ai():
     """Initialize Vertex AI with project and location settings."""
-    from streamlit import secrets
-    project_id = secrets.get("GOOGLE_CLOUD_PROJECT")
-    location = secrets.get("GOOGLE_CLOUD_LOCATION", "us-central1")
+    project_id = st.secrets.get("GOOGLE_CLOUD_PROJECT")
+    location = st.secrets.get("GOOGLE_CLOUD_LOCATION", "us-central1")
     
     if not project_id:
         raise ValueError("GOOGLE_CLOUD_PROJECT not found in Streamlit secrets")
