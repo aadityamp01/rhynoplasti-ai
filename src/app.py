@@ -10,7 +10,7 @@ from PIL import Image
 import io
 import requests
 import threading
-from src.api.process_image import api_bp
+from .api.process_image import api_bp
 
 # Initialize MediaPipe Face Mesh
 mp_face_mesh = mp.solutions.face_mesh
