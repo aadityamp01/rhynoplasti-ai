@@ -269,13 +269,13 @@
             <div class="upload-btn" id="upload-btn">Upload Image</div>
             <input type="file" id="image-upload" accept="image/*" style="display: none;">
             <div class="upload-text">Click to upload a photo of your face</div>
-                </div>
-                
+        </div>
+        
         <!-- Ready message - will be shown after image upload -->
         <div id="ready-message" class="ready-message" style="display: none;">
             Image loaded! Click on any effect button below to apply rhinoplasty effects.
-                </div>
-                
+        </div>
+        
         <!-- Effect instructions -->
         <div id="effect-instructions" class="effect-instructions" style="display: none;">
             <p>Choose an effect to apply to your image:</p>
@@ -313,6 +313,9 @@
     <!-- Banuba SDK -->
     <script src="https://sdk.banuba.com/ar/1.0.0/banuba-ar.js"></script>
     
+    <!-- Face-API.js for face detection and landmark detection -->
+    <script src="https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/dist/face-api.min.js"></script>
+    
     <!-- AR Integration -->
     <script type="module">
         import { Player, Module, Effect, Dom, ImageCapture } from "https://cdn.jsdelivr.net/npm/@banuba/webar/dist/BanubaSDK.browser.esm.js";
@@ -325,6 +328,8 @@
         let canvas = null;
         let ctx = null;
         let banubaInitialized = false;
+        let faceDetected = false;
+        let faceLandmarks = null;
         
         // Get the token from the global variable
         const clientToken = window.BANUBA_CLIENT_TOKEN;
@@ -352,8 +357,15 @@
                 } else {
                     console.error('Banuba client token not available');
                 }
+                
+                // Load face-api models
+                await Promise.all([
+                    faceapi.nets.tinyFaceDetector.loadFromUri('/models'),
+                    faceapi.nets.faceLandmark68Net.loadFromUri('/models')
+                ]);
+                console.log('Face detection models loaded');
             } catch (error) {
-                console.error('Failed to initialize Banuba SDK:', error);
+                console.error('Failed to initialize:', error);
             }
             
             console.log('Canvas initialized');
@@ -401,6 +413,9 @@
                         // Store the original image data
                         originalImage = canvas.toDataURL('image/png');
                         
+                        // Detect face and landmarks
+                        await detectFace();
+                        
                         // Display the image in the result container
                         document.getElementById('result-image').src = originalImage;
                         document.getElementById('result-container').style.display = 'block';
@@ -423,6 +438,30 @@
                     document.getElementById('permission-message').textContent = 'Error loading image: ' + error.message;
                     document.getElementById('permission-message').style.display = 'block';
                 }
+            }
+        }
+
+        // Detect face and landmarks
+        async function detectFace() {
+            try {
+                // Detect face
+                const detections = await faceapi.detectAllFaces(canvas, new faceapi.TinyFaceDetectorOptions())
+                    .withFaceLandmarks();
+                
+                if (detections && detections.length > 0) {
+                    faceDetected = true;
+                    faceLandmarks = detections[0].landmarks;
+                    console.log('Face detected with landmarks:', faceLandmarks);
+                    
+                    // Draw landmarks for debugging (optional)
+                    // faceapi.draw.drawFaceLandmarks(canvas, detections);
+                } else {
+                    faceDetected = false;
+                    console.warn('No face detected in the image');
+                }
+            } catch (error) {
+                console.error('Error detecting face:', error);
+                faceDetected = false;
             }
         }
 
@@ -479,6 +518,11 @@
                     
                     // Draw the image on the canvas
                     ctx.drawImage(img, 0, 0);
+                    
+                    // Detect face and landmarks if not already detected
+                    if (!faceDetected) {
+                        await detectFace();
+                    }
                     
                     // Apply the AI-based rhinoplasty effect
                     await applyAIRhinoplasty(ctx, effectType);
@@ -583,11 +627,26 @@
             const imageData = tempCtx.getImageData(0, 0, tempCanvas.width, tempCanvas.height);
             const data = imageData.data;
             
-            // Define the nose bridge region (approximate)
-            const centerX = tempCanvas.width / 2;
-            const centerY = tempCanvas.height / 2;
-            const noseWidth = tempCanvas.width * 0.15;
-            const noseHeight = tempCanvas.height * 0.2;
+            // Define the nose bridge region based on face landmarks or use approximate values
+            let centerX, centerY, noseWidth, noseHeight;
+            
+            if (faceDetected && faceLandmarks) {
+                // Get nose bridge points from landmarks
+                const noseBridge = faceLandmarks.getNose();
+                const noseTop = noseBridge[0];
+                const noseBottom = noseBridge[6];
+                
+                centerX = (noseTop.x + noseBottom.x) / 2;
+                centerY = (noseTop.y + noseBottom.y) / 2;
+                noseWidth = Math.abs(noseBridge[3].x - noseBridge[4].x) * 1.5;
+                noseHeight = Math.abs(noseTop.y - noseBottom.y) * 1.2;
+            } else {
+                // Use approximate values if face detection failed
+                centerX = tempCanvas.width / 2;
+                centerY = tempCanvas.height / 2;
+                noseWidth = tempCanvas.width * 0.15;
+                noseHeight = tempCanvas.height * 0.2;
+            }
             
             // Apply the effect to the nose bridge region
             for (let y = centerY - noseHeight / 2; y < centerY + noseHeight / 2; y++) {
@@ -631,11 +690,25 @@
             const imageData = tempCtx.getImageData(0, 0, tempCanvas.width, tempCanvas.height);
             const data = imageData.data;
             
-            // Define the nose tip region (approximate)
-            const centerX = tempCanvas.width / 2;
-            const centerY = tempCanvas.height / 2 + tempCanvas.height * 0.1; // Slightly below center
-            const tipWidth = tempCanvas.width * 0.1;
-            const tipHeight = tempCanvas.height * 0.1;
+            // Define the nose tip region based on face landmarks or use approximate values
+            let centerX, centerY, tipWidth, tipHeight;
+            
+            if (faceDetected && faceLandmarks) {
+                // Get nose tip points from landmarks
+                const noseTip = faceLandmarks.getNose();
+                const tipPoint = noseTip[6]; // Nose tip point
+                
+                centerX = tipPoint.x;
+                centerY = tipPoint.y;
+                tipWidth = Math.abs(noseTip[3].x - noseTip[4].x) * 0.8;
+                tipHeight = Math.abs(noseTip[5].y - noseTip[7].y) * 0.8;
+            } else {
+                // Use approximate values if face detection failed
+                centerX = tempCanvas.width / 2;
+                centerY = tempCanvas.height / 2 + tempCanvas.height * 0.1; // Slightly below center
+                tipWidth = tempCanvas.width * 0.1;
+                tipHeight = tempCanvas.height * 0.1;
+            }
             
             // Apply the effect to the nose tip region
             for (let y = centerY - tipHeight / 2; y < centerY + tipHeight / 2; y++) {
@@ -679,11 +752,28 @@
             const imageData = tempCtx.getImageData(0, 0, tempCanvas.width, tempCanvas.height);
             const data = imageData.data;
             
-            // Define the nose region (approximate)
-            const centerX = tempCanvas.width / 2;
-            const centerY = tempCanvas.height / 2;
-            const noseWidth = tempCanvas.width * 0.2;
-            const noseHeight = tempCanvas.height * 0.3;
+            // Define the nose region based on face landmarks or use approximate values
+            let centerX, centerY, noseWidth, noseHeight;
+            
+            if (faceDetected && faceLandmarks) {
+                // Get nose points from landmarks
+                const nose = faceLandmarks.getNose();
+                const noseTop = nose[0];
+                const noseBottom = nose[6];
+                const noseLeft = nose[3];
+                const noseRight = nose[4];
+                
+                centerX = (noseLeft.x + noseRight.x) / 2;
+                centerY = (noseTop.y + noseBottom.y) / 2;
+                noseWidth = Math.abs(noseLeft.x - noseRight.x) * 1.5;
+                noseHeight = Math.abs(noseTop.y - noseBottom.y) * 1.5;
+            } else {
+                // Use approximate values if face detection failed
+                centerX = tempCanvas.width / 2;
+                centerY = tempCanvas.height / 2;
+                noseWidth = tempCanvas.width * 0.2;
+                noseHeight = tempCanvas.height * 0.3;
+            }
             
             // Create a new image data for the result
             const resultData = new Uint8ClampedArray(data);
@@ -738,11 +828,28 @@
             const imageData = tempCtx.getImageData(0, 0, tempCanvas.width, tempCanvas.height);
             const data = imageData.data;
             
-            // Define the nose region (approximate)
-            const centerX = tempCanvas.width / 2;
-            const centerY = tempCanvas.height / 2;
-            const noseWidth = tempCanvas.width * 0.15;
-            const noseHeight = tempCanvas.height * 0.25;
+            // Define the nose region based on face landmarks or use approximate values
+            let centerX, centerY, noseWidth, noseHeight;
+            
+            if (faceDetected && faceLandmarks) {
+                // Get nose points from landmarks
+                const nose = faceLandmarks.getNose();
+                const noseTop = nose[0];
+                const noseBottom = nose[6];
+                const noseLeft = nose[3];
+                const noseRight = nose[4];
+                
+                centerX = (noseLeft.x + noseRight.x) / 2;
+                centerY = (noseTop.y + noseBottom.y) / 2;
+                noseWidth = Math.abs(noseLeft.x - noseRight.x) * 1.5;
+                noseHeight = Math.abs(noseTop.y - noseBottom.y) * 1.5;
+            } else {
+                // Use approximate values if face detection failed
+                centerX = tempCanvas.width / 2;
+                centerY = tempCanvas.height / 2;
+                noseWidth = tempCanvas.width * 0.15;
+                noseHeight = tempCanvas.height * 0.25;
+            }
             
             // Create a new image data for the result
             const resultData = new Uint8ClampedArray(data);

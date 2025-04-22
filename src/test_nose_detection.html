@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Nose Detection Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            background-color: #f5f5f5;
+        }
+        .container {
+            max-width: 800px;
+            width: 100%;
+        }
+        .upload-container {
+            text-align: center;
+            margin: 20px auto;
+            padding: 20px;
+            border: 2px dashed #007bff;
+            border-radius: 8px;
+            background-color: #f8f9fa;
+        }
+        .upload-btn {
+            display: inline-block;
+            padding: 12px 24px;
+            background-color: #007bff;
+            color: white;
+            border-radius: 5px;
+            cursor: pointer;
+            font-weight: bold;
+            margin-bottom: 10px;
+        }
+        .result-container {
+            margin: 20px 0;
+            text-align: center;
+        }
+        canvas {
+            max-width: 100%;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            margin-top: 20px;
+        }
+        .controls {
+            margin: 20px 0;
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+        }
+        button {
+            padding: 8px 16px;
+            border-radius: 4px;
+            border: none;
+            background-color: #007bff;
+            color: white;
+            cursor: pointer;
+        }
+        .status {
+            margin: 10px 0;
+            padding: 10px;
+            border-radius: 4px;
+            background-color: #e9ecef;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Nose Detection Test</h1>
+        <p>Upload an image to test nose detection accuracy</p>
+        
+        <div class="upload-container">
+            <div class="upload-btn" id="upload-btn">Upload Image</div>
+            <input type="file" id="image-upload" accept="image/*" style="display: none;">
+        </div>
+        
+        <div class="status" id="status">Ready to test</div>
+        
+        <div class="result-container">
+            <canvas id="canvas"></canvas>
+        </div>
+        
+        <div class="controls">
+            <button id="detect-btn">Detect Nose</button>
+            <button id="reset-btn">Reset</button>
+        </div>
+    </div>
+
+    <!-- Face-API.js for face detection and landmark detection -->
+    <script src="https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/dist/face-api.min.js"></script>
+    
+    <script>
+        let canvas = null;
+        let ctx = null;
+        let originalImage = null;
+        
+        // Initialize on page load
+        window.addEventListener('load', async () => {
+            // Initialize canvas
+            canvas = document.getElementById('canvas');
+            ctx = canvas.getContext('2d');
+            
+            // Set up upload button
+            document.getElementById('upload-btn').addEventListener('click', () => {
+                document.getElementById('image-upload').click();
+            });
+            
+            // Set up image upload handling
+            document.getElementById('image-upload').addEventListener('change', handleImageUpload);
+            
+            // Set up detect button
+            document.getElementById('detect-btn').addEventListener('click', detectNose);
+            
+            // Set up reset button
+            document.getElementById('reset-btn').addEventListener('click', resetCanvas);
+            
+            // Load face-api models
+            try {
+                document.getElementById('status').textContent = 'Loading face detection models...';
+                await Promise.all([
+                    faceapi.nets.tinyFaceDetector.loadFromUri('/models'),
+                    faceapi.nets.faceLandmark68Net.loadFromUri('/models')
+                ]);
+                document.getElementById('status').textContent = 'Models loaded successfully. Ready to test.';
+                console.log('Face detection models loaded');
+            } catch (error) {
+                document.getElementById('status').textContent = 'Error loading models: ' + error.message;
+                console.error('Failed to load face detection models:', error);
+            }
+        });
+        
+        // Handle image upload
+        function handleImageUpload(event) {
+            const file = event.target.files[0];
+            if (file) {
+                try {
+                    document.getElementById('status').textContent = 'Loading image...';
+                    // Create a URL for the file
+                    const imageUrl = URL.createObjectURL(file);
+                    
+                    // Create an image element to load the file
+                    const img = new Image();
+                    img.onload = () => {
+                        // Set canvas dimensions to match the image
+                        canvas.width = img.width;
+                        canvas.height = img.height;
+                        
+                        // Draw the image on the canvas
+                        ctx.drawImage(img, 0, 0);
+                        
+                        // Store the original image
+                        originalImage = img;
+                        
+                        document.getElementById('status').textContent = 'Image loaded. Click "Detect Nose" to test detection.';
+                        console.log('Image loaded, dimensions:', img.width, 'x', img.height);
+                    };
+                    
+                    img.src = imageUrl;
+                } catch (error) {
+                    document.getElementById('status').textContent = 'Error loading image: ' + error.message;
+                    console.error('Error loading image:', error);
+                }
+            }
+        }
+        
+        // Detect nose
+        async function detectNose() {
+            if (!originalImage) {
+                document.getElementById('status').textContent = 'Please upload an image first.';
+                return;
+            }
+            
+            try {
+                document.getElementById('status').textContent = 'Detecting face and nose...';
+                
+                // Detect face
+                const detections = await faceapi.detectAllFaces(canvas, new faceapi.TinyFaceDetectorOptions())
+                    .withFaceLandmarks();
+                
+                if (detections && detections.length > 0) {
+                    // Draw the original image
+                    ctx.drawImage(originalImage, 0, 0);
+                    
+                    // Draw face landmarks
+                    faceapi.draw.drawFaceLandmarks(canvas, detections);
+                    
+                    // Highlight nose points
+                    const nosePoints = detections[0].landmarks.getNose();
+                    ctx.fillStyle = 'rgba(255, 0, 0, 0.5)';
+                    nosePoints.forEach(point => {
+                        ctx.beginPath();
+                        ctx.arc(point.x, point.y, 3, 0, 2 * Math.PI);
+                        ctx.fill();
+                    });
+                    
+                    // Draw nose region
+                    const noseTop = nosePoints[0];
+                    const noseBottom = nosePoints[6];
+                    const noseLeft = nosePoints[3];
+                    const noseRight = nosePoints[4];
+                    
+                    ctx.strokeStyle = 'rgba(0, 255, 0, 0.8)';
+                    ctx.lineWidth = 2;
+                    ctx.strokeRect(
+                        noseLeft.x - 10,
+                        noseTop.y - 10,
+                        noseRight.x - noseLeft.x + 20,
+                        noseBottom.y - noseTop.y + 20
+                    );
+                    
+                    document.getElementById('status').textContent = 'Nose detected successfully!';
+                    console.log('Nose detected:', nosePoints);
+                } else {
+                    document.getElementById('status').textContent = 'No face detected in the image.';
+                    console.warn('No face detected in the image');
+                }
+            } catch (error) {
+                document.getElementById('status').textContent = 'Error detecting nose: ' + error.message;
+                console.error('Error detecting nose:', error);
+            }
+        }
+        
+        // Reset canvas
+        function resetCanvas() {
+            if (originalImage) {
+                ctx.drawImage(originalImage, 0, 0);
+                document.getElementById('status').textContent = 'Canvas reset.';
+            } else {
+                document.getElementById('status').textContent = 'No image to reset.';
+            }
+        }
+    </script>
+</body>
+</html> 
