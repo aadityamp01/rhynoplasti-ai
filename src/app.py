@@ -9,6 +9,8 @@ import base64
 from PIL import Image
 import io
 import requests
+import threading
+from api.process_image import api_bp
 
 # Initialize MediaPipe Face Mesh
 mp_face_mesh = mp.solutions.face_mesh
@@ -18,6 +20,13 @@ face_mesh = mp_face_mesh.FaceMesh(
     min_detection_confidence=0.5,
     min_tracking_confidence=0.5
 )
+
+# Initialize Flask app
+app = Flask(__name__)
+CORS(app)
+
+# Register the API blueprint
+app.register_blueprint(api_bp, url_prefix='/api')
 
 # Set up Streamlit page config
 st.set_page_config(
@@ -76,9 +85,9 @@ RHINOPLASTY_OPTIONS = {
     }
 }
 
-# Initialize Flask app
-app = Flask(__name__)
-CORS(app)
+def run_flask():
+    """Run the Flask server in a separate thread."""
+    app.run(host='0.0.0.0', port=5000)
 
 def detect_nose_landmarks(image):
     """Detect nose landmarks using MediaPipe Face Mesh."""
@@ -291,7 +300,7 @@ def process_image_with_api(image, effect):
         image_base64 = base64.b64encode(img_byte_arr).decode('utf-8')
         
         # Prepare the request
-        url = "http://localhost:5000/process-image"
+        url = "http://localhost:5000/api/process-image"
         payload = {
             "image": f"data:image/jpeg;base64,{image_base64}",
             "effect": effect
@@ -307,12 +316,16 @@ def process_image_with_api(image, effect):
                 result_image_data = result['processed_image'].split(',')[1]
                 result_image_bytes = base64.b64decode(result_image_data)
                 return Image.open(io.BytesIO(result_image_bytes))
+            else:
+                st.error(f"API Error: {result.get('error', 'Unknown error')}")
+        else:
+            st.error(f"API Error: Status code {response.status_code}")
         
         # If something went wrong, return the original image
         return image
         
     except Exception as e:
-        print(f"Error processing image with API: {e}")
+        st.error(f"Error processing image with API: {str(e)}")
         return image
 
 @app.route('/')
@@ -345,6 +358,11 @@ def process_image():
         return jsonify({"error": str(e)}), 500
 
 def main():
+    # Start Flask server in a separate thread
+    flask_thread = threading.Thread(target=run_flask)
+    flask_thread.daemon = True
+    flask_thread.start()
+    
     st.title("AI Rhinoplasty Simulator")
     
     # File uploader

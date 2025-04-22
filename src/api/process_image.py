@@ -14,11 +14,11 @@ api_bp = Blueprint('api', __name__)
 
 def init_vertex_ai():
     """Initialize Vertex AI with project and location settings."""
-    project_id = st.secrets.get("GOOGLE_CLOUD_PROJECT")
-    location = st.secrets.get("GOOGLE_CLOUD_LOCATION", "us-central1")
+    project_id = os.getenv("GOOGLE_CLOUD_PROJECT")
+    location = os.getenv("GOOGLE_CLOUD_LOCATION", "us-central1")
     
     if not project_id:
-        raise ValueError("GOOGLE_CLOUD_PROJECT not found in Streamlit secrets")
+        raise ValueError("GOOGLE_CLOUD_PROJECT not found in environment variables")
     
     aiplatform.init(project=project_id, location=location)
     return True
@@ -38,29 +38,37 @@ def process_image_with_vertex_ai(image_base64, prompt):
             temp_file.write(image_data)
             image_path = temp_file.name
         
-        # Create the Imagen model
-        model = aiplatform.ImageGenerationModel.from_pretrained("imagegeneration@002")
-        
-        # Generate the image
-        response = model.generate_images(
-            prompt=prompt,
-            base_image=image_path,
-            number_of_images=1,
-            seed=42
-        )
-        
-        # Get the generated image
-        generated_image = response.images[0]
-        
-        # Convert the image to base64
-        image_base64 = base64.b64encode(generated_image).decode('utf-8')
-        
-        # Clean up temporary files
-        os.unlink(image_path)
-        
-        return {"resultImage": f"data:image/jpeg;base64,{image_base64}"}
+        try:
+            # Create the Imagen model
+            model = aiplatform.ImageGenerationModel.from_pretrained("imagegeneration@002")
+            
+            # Generate the image
+            response = model.generate_images(
+                prompt=prompt,
+                base_image=image_path,
+                number_of_images=1,
+                seed=42
+            )
+            
+            # Get the generated image
+            generated_image = response.images[0]
+            
+            # Convert the image to base64
+            image_base64 = base64.b64encode(generated_image).decode('utf-8')
+            
+            return {"resultImage": f"data:image/jpeg;base64,{image_base64}"}
+            
+        except Exception as e:
+            print(f"Error in Vertex AI processing: {str(e)}")
+            return {"error": f"Vertex AI processing error: {str(e)}"}
+            
+        finally:
+            # Clean up temporary files
+            if os.path.exists(image_path):
+                os.unlink(image_path)
+                
     except Exception as e:
-        print(f"Error processing image with Vertex AI: {e}")
+        print(f"Error in process_image_with_vertex_ai: {str(e)}")
         return {"error": str(e)}
 
 # API endpoint to process an image
@@ -101,4 +109,5 @@ def process_image():
         })
             
     except Exception as e:
+        print(f"Error in process_image endpoint: {str(e)}")
         return jsonify({'error': str(e)}), 500 
