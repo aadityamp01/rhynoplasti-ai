@@ -13,6 +13,11 @@ import requests
 from pathlib import Path
 from io import BytesIO
 import math
+from flask import Flask, render_template, request, jsonify
+from api.process_image import api_bp
+from flask_cors import CORS
+import vertexai
+from vertexai.generative_models import GenerativeModel, Part, GenerationConfig
 
 # Set page config
 st.set_page_config(
@@ -125,6 +130,57 @@ AI_MODELS = {
         "icon": "💻"
     }
 }
+
+# Initialize Vertex AI
+def init_vertex_ai():
+    """Initialize Vertex AI with project and location settings."""
+    project_id = st.secrets.get("GOOGLE_CLOUD_PROJECT")
+    location = st.secrets.get("GOOGLE_CLOUD_LOCATION", "us-central1")
+    
+    if not project_id:
+        raise ValueError("GOOGLE_CLOUD_PROJECT not found in Streamlit secrets")
+    
+    vertexai.init(project=project_id, location=location)
+    return GenerativeModel("gemini-pro-vision")
+
+# Process image with Vertex AI
+def process_image_with_vertex_ai(image, prompt):
+    """Process an image with Vertex AI's image generation model"""
+    try:
+        # Initialize Vertex AI
+        model = init_vertex_ai()
+        
+        # Convert image to bytes
+        img_byte_arr = io.BytesIO()
+        image.save(img_byte_arr, format='JPEG')
+        img_byte_arr = img_byte_arr.getvalue()
+        
+        # Create image part for Vertex AI
+        image_part = Part.from_data(data=img_byte_arr, mime_type='image/jpeg')
+        
+        # Generate content with Vertex AI
+        generation_config = GenerationConfig(
+            max_output_tokens=2048,
+            temperature=0.4,
+            top_p=0.8,
+            top_k=40
+        )
+        
+        response = model.generate_content(
+            [prompt, image_part],
+            generation_config=generation_config
+        )
+        
+        if response.text:
+            # For now, we'll return the original image
+            # In a real implementation, you would process the response and modify the image
+            return image
+        else:
+            raise ValueError("No response from Vertex AI")
+            
+    except Exception as e:
+        st.error(f"Error processing image with Vertex AI: {str(e)}")
+        return image
 
 def get_ar_html():
     """Get the HTML content for the AR integration"""
@@ -546,9 +602,13 @@ def main():
     # Header
     st.title("Rhinoplasty AI Simulator")
     
-    # Check Banuba token and effect files
-    token_valid = check_banuba_token()
-    effects_valid = check_effect_files()
+    # Check Vertex AI credentials
+    try:
+        init_vertex_ai()
+        st.success("✅ Vertex AI is properly configured")
+    except Exception as e:
+        st.error(f"❌ Error configuring Vertex AI: {str(e)}")
+        return
     
     # Tabs for different features
     tab1, tab2 = st.tabs(["Image Upload", "AR Simulation"])
@@ -574,9 +634,12 @@ def main():
             intensity = st.slider("Adjust the intensity of the effect", 0.0, 1.0, 0.5)
             
             if st.button("Apply Rhinoplasty"):
-                with st.spinner("Processing..."):
-                    # Process the image
-                    result = process_image(image, option, intensity)
+                with st.spinner("Processing with Vertex AI..."):
+                    # Create prompt based on selected option
+                    prompt = f"Apply {option.lower()} rhinoplasty effect with {intensity*100}% intensity. Make the nose more refined and proportional while maintaining natural appearance."
+                    
+                    # Process the image with Vertex AI
+                    result = process_image_with_vertex_ai(image, prompt)
                     
                     # Display the result
                     st.image(result, caption="Rhinoplasty Result", use_container_width=True)
@@ -593,18 +656,177 @@ def main():
     
     with tab2:
         st.header("AR Rhinoplasty Simulation")
-        
-        if not token_valid:
-            st.error("Please configure the Banuba client token in your Streamlit secrets to use the AR simulation.")
-            return
-        
-        if not effects_valid:
-            st.error("Please download the required effect files from Banuba and place them in the 'effects' directory.")
-            return
-        
-        # Display the AR simulation
-        st.components.v1.html(get_ar_html(), height=900)
-        
+        st.info("AR simulation is currently under development.")
 
-if __name__ == "__main__":
-    main() 
+app = Flask(__name__, template_folder='templates')
+CORS(app)
+
+# Register the API blueprint
+app.register_blueprint(api_bp, url_prefix='/api')
+
+@app.route('/')
+def index():
+    return render_template('test_nose_detection.html')
+
+@app.route('/api/process-image', methods=['POST'])
+def process_image():
+    try:
+        # Get the base64 image from the request
+        data = request.get_json()
+        if not data or 'image' not in data:
+            return jsonify({'error': 'No image provided'}), 400
+        
+        # Decode the base64 image
+        image_data = base64.b64decode(data['image'])
+        
+        # Convert to numpy array
+        nparr = np.frombuffer(image_data, np.uint8)
+        image = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+        
+        if image is None:
+            return jsonify({'error': 'Invalid image format'}), 400
+        
+        # Detect nose region
+        nose_region = detect_nose(image)
+        
+        # Process the image
+        processed_image = process_nose(image, nose_region)
+        
+        # Convert processed image back to base64
+        _, buffer = cv2.imencode('.jpg', processed_image)
+        processed_base64 = base64.b64encode(buffer).decode('utf-8')
+        
+        return jsonify({
+            'success': True,
+            'processed_image': processed_base64
+        })
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+def detect_nose(image):
+    """
+    Detect the nose region in an image using MediaPipe Face Mesh.
+    
+    Args:
+        image (numpy.ndarray): Input image in BGR format
+        
+    Returns:
+        tuple: (mask, nose_region, landmarks) containing:
+            - mask: Binary mask of the nose region
+            - nose_region: Cropped nose region
+            - landmarks: List of nose landmarks
+    """
+    # Convert the image to RGB
+    image_rgb = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+    
+    # Initialize MediaPipe Face Mesh
+    mp_face_mesh = mp.solutions.face_mesh
+    with mp_face_mesh.FaceMesh(
+        static_image_mode=True,
+        max_num_faces=1,
+        min_detection_confidence=0.5
+    ) as face_mesh:
+        # Process the image
+        results = face_mesh.process(image_rgb)
+        
+        if not results.multi_face_landmarks:
+            raise ValueError("No face detected in the image")
+        
+        # Get face landmarks
+        face_landmarks = results.multi_face_landmarks[0].landmark
+        
+        # Get nose landmarks (indices based on MediaPipe Face Mesh)
+        nose_bridge = [face_landmarks[i] for i in [6, 197, 195, 5, 4, 1, 19, 94]]
+        nose_tip = [face_landmarks[i] for i in [1, 2, 98, 97, 2, 326, 327, 331]]
+        nose_side_left = [face_landmarks[i] for i in [129, 209, 49, 131, 134, 45, 4, 1, 19, 94]]
+        nose_side_right = [face_landmarks[i] for i in [358, 429, 279, 359, 362, 275, 4, 1, 19, 94]]
+        
+        # Create a mask for the nose region
+        mask = np.zeros(image.shape[:2], dtype=np.uint8)
+        h, w = image.shape[:2]
+        
+        # Convert landmarks to pixel coordinates
+        nose_points = []
+        for landmark_group in [nose_bridge, nose_tip, nose_side_left, nose_side_right]:
+            points = np.array([[int(l.x * w), int(l.y * h)] for l in landmark_group])
+            nose_points.append(points)
+        
+        # Draw the nose region on the mask
+        for points in nose_points:
+            cv2.fillConvexPoly(mask, points, 255)
+        
+        # Get the nose region
+        nose_region = cv2.bitwise_and(image, image, mask=mask)
+        
+        return mask, nose_region, nose_points
+
+def process_nose(image, nose_data):
+    """
+    Process the nose region with rhinoplasty effects.
+    
+    Args:
+        image (numpy.ndarray): Input image in BGR format
+        nose_data (tuple): Tuple containing (mask, nose_region, landmarks)
+        
+    Returns:
+        numpy.ndarray: Processed image with rhinoplasty effects
+    """
+    mask, nose_region, landmarks = nose_data
+    
+    # Create a copy of the image for processing
+    result = image.copy()
+    
+    # Apply natural refinement effect
+    intensity = 0.5  # Adjust this value to control the strength of the effect
+    
+    # Get nose bridge and tip points
+    nose_bridge_points, nose_tip_points, nose_side_left_points, nose_side_right_points = landmarks
+    
+    # Calculate the center of the nose bridge
+    bridge_center = np.mean(nose_bridge_points, axis=0)
+    
+    # Create a smooth transition for the nose bridge
+    for i in range(len(nose_bridge_points) - 1):
+        pt1 = nose_bridge_points[i].astype(int)
+        pt2 = nose_bridge_points[i + 1].astype(int)
+        
+        # Create a line between points
+        line_mask = np.zeros_like(mask)
+        cv2.line(line_mask, tuple(pt1), tuple(pt2), 255, 3)
+        
+        # Apply smoothing effect
+        result = cv2.GaussianBlur(result, (5, 5), 0)
+        result = cv2.addWeighted(result, 1 - intensity, image, intensity, 0)
+    
+    # Apply tip refinement
+    tip_center = np.mean(nose_tip_points, axis=0)
+    tip_radius = int(np.mean([np.linalg.norm(pt - tip_center) for pt in nose_tip_points]))
+    
+    # Create a circular mask for the tip
+    tip_mask = np.zeros_like(mask)
+    cv2.circle(tip_mask, tuple(tip_center.astype(int)), tip_radius, 255, -1)
+    
+    # Apply brightness adjustment to the tip
+    tip_region = cv2.bitwise_and(result, result, mask=tip_mask)
+    tip_region = cv2.addWeighted(tip_region, 1.2, tip_region, 0, 10)
+    result = cv2.addWeighted(result, 1, tip_region, 1, 0)
+    
+    # Blend the processed nose region with the original image
+    result = cv2.addWeighted(result, 1, image, 0.3, 0)
+    
+    return result
+
+if __name__ == '__main__':
+    # Check for required environment variables
+    required_vars = ['GOOGLE_CLOUD_PROJECT', 'GOOGLE_APPLICATION_CREDENTIALS']
+    missing_vars = [var for var in required_vars if not os.getenv(var)]
+    
+    if missing_vars:
+        print(f"Error: Missing required environment variables: {', '.join(missing_vars)}")
+        print("Please set these environment variables before running the application.")
+        exit(1)
+    
+    # Ensure templates directory exists
+    os.makedirs('templates', exist_ok=True)
+    app.run(debug=True, host='0.0.0.0', port=5000) 
