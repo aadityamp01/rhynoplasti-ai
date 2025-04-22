@@ -8,8 +8,6 @@ from google.oauth2 import service_account
 import streamlit as st
 import io
 from PIL import Image
-import vertexai
-from vertexai.generative_models import GenerativeModel, Part, GenerationConfig
 
 # Create a Blueprint for the API
 api_bp = Blueprint('api', __name__)
@@ -22,12 +20,11 @@ def init_vertex_ai():
     if not project_id:
         raise ValueError("GOOGLE_CLOUD_PROJECT not found in Streamlit secrets")
     
-    vertexai.init(project=project_id, location=location)
-    return GenerativeModel("gemini-pro-vision")
+    aiplatform.init(project=project_id, location=location)
+    return True
 
-# Process image with Vertex AI
 def process_image_with_vertex_ai(image_base64, prompt):
-    """Process an image with Vertex AI's image generation model"""
+    """Process an image with Vertex AI's Imagen model."""
     try:
         # Initialize Vertex AI
         if not init_vertex_ai():
@@ -41,7 +38,7 @@ def process_image_with_vertex_ai(image_base64, prompt):
             temp_file.write(image_data)
             image_path = temp_file.name
         
-        # Create the model
+        # Create the Imagen model
         model = aiplatform.ImageGenerationModel.from_pretrained("imagegeneration@002")
         
         # Generate the image
@@ -76,51 +73,32 @@ def process_image():
         if not data or 'image' not in data:
             return jsonify({'error': 'No image data provided'}), 400
         
-        # Decode base64 image
-        image_data = base64.b64decode(data['image'])
-        image = Image.open(io.BytesIO(image_data))
+        # Get the effect type
+        effect = data.get('effect', 'Natural Refinement')
         
-        # Get prompt from request or use default
-        prompt = data.get('prompt', 'Apply rhinoplasty effect to make the nose more refined and proportional while maintaining natural appearance.')
+        # Define prompts for different effects
+        prompts = {
+            "Natural Refinement": "Apply subtle rhinoplasty to make the nose more refined and proportional. Focus on gentle contouring and slight reduction in size. Maintain natural facial features and skin texture. The result should look like a natural, post-surgery outcome.",
+            "Bridge Reduction": "Perform rhinoplasty to reduce the height of the nose bridge. Create a more delicate and balanced profile while maintaining natural facial harmony. The bridge should appear slightly lower but still look natural and proportional.",
+            "Tip Refinement": "Refine the nose tip through rhinoplasty to create better definition and projection. Make it more elegant while keeping it natural-looking. The tip should be slightly more defined but not overly sculpted.",
+            "Nose Narrowing": "Apply rhinoplasty to narrow the nose width, creating better facial proportions. The nose should appear slightly narrower while maintaining natural appearance and avoiding any artificial look.",
+            "Crooked Correction": "Correct any nose deviation through rhinoplasty to improve facial symmetry. The nose should appear straight and centered while maintaining natural appearance and avoiding any signs of artificial correction.",
+            "Combined Enhancement": "Apply comprehensive rhinoplasty combining multiple refinements. The nose should appear more refined, proportional, and balanced while maintaining a completely natural appearance. All changes should look like the result of skilled surgical intervention."
+        }
         
-        # Initialize Vertex AI
-        model = init_vertex_ai()
+        # Get the appropriate prompt
+        prompt = prompts.get(effect, prompts["Natural Refinement"])
         
-        # Convert image to bytes for Vertex AI
-        img_byte_arr = io.BytesIO()
-        image.save(img_byte_arr, format='JPEG')
-        img_byte_arr = img_byte_arr.getvalue()
+        # Process the image
+        result = process_image_with_vertex_ai(data['image'], prompt)
         
-        # Create image part for Vertex AI
-        image_part = Part.from_data(data=img_byte_arr, mime_type='image/jpeg')
-        
-        # Generate content with Vertex AI
-        generation_config = GenerationConfig(
-            max_output_tokens=2048,
-            temperature=0.4,
-            top_p=0.8,
-            top_k=40
-        )
-        
-        response = model.generate_content(
-            [prompt, image_part],
-            generation_config=generation_config
-        )
-        
-        if response.text:
-            # For now, we'll return the original image
-            # In a real implementation, you would process the response and modify the image
-            img_byte_arr = io.BytesIO()
-            image.save(img_byte_arr, format='JPEG')
-            img_byte_arr = img_byte_arr.getvalue()
-            processed_image = base64.b64encode(img_byte_arr).decode('utf-8')
+        if "error" in result:
+            return jsonify({'error': result["error"]}), 500
             
-            return jsonify({
-                'success': True,
-                'processed_image': f"data:image/jpeg;base64,{processed_image}"
-            })
-        else:
-            return jsonify({'error': 'No response from Vertex AI'}), 500
+        return jsonify({
+            'success': True,
+            'processed_image': result["resultImage"]
+        })
             
     except Exception as e:
         return jsonify({'error': str(e)}), 500 

@@ -8,8 +8,7 @@ import os
 import base64
 from PIL import Image
 import io
-import vertexai
-from vertexai.generative_models import GenerativeModel, Part, GenerationConfig
+import requests
 
 # Initialize MediaPipe Face Mesh
 mp_face_mesh = mp.solutions.face_mesh
@@ -19,18 +18,6 @@ face_mesh = mp_face_mesh.FaceMesh(
     min_detection_confidence=0.5,
     min_tracking_confidence=0.5
 )
-
-# Initialize Vertex AI
-def init_vertex_ai():
-    """Initialize Vertex AI with project and location settings."""
-    project_id = os.getenv("GOOGLE_CLOUD_PROJECT")
-    location = os.getenv("GOOGLE_CLOUD_LOCATION", "us-central1")
-    
-    if not project_id:
-        raise ValueError("GOOGLE_CLOUD_PROJECT not found in environment variables")
-    
-    vertexai.init(project=project_id, location=location)
-    return GenerativeModel("gemini-pro-vision")
 
 # Set up Streamlit page config
 st.set_page_config(
@@ -61,31 +48,31 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# Rhinoplasty options with Vertex AI prompts
+# Rhinoplasty options
 RHINOPLASTY_OPTIONS = {
     "Natural Refinement": {
         "description": "Subtle nose refinement for a more balanced profile",
-        "prompt": "Apply subtle rhinoplasty to make the nose more refined and proportional while maintaining natural appearance. Focus on gentle contouring and slight reduction in size."
+        "prompt": "Apply subtle rhinoplasty to make the nose more refined and proportional. Focus on gentle contouring and slight reduction in size. Maintain natural facial features and skin texture. The result should look like a natural, post-surgery outcome."
     },
     "Bridge Reduction": {
         "description": "Reduce nose bridge height for a more delicate profile",
-        "prompt": "Apply rhinoplasty to reduce the height of the nose bridge, creating a more delicate and balanced profile. Maintain natural facial harmony."
+        "prompt": "Perform rhinoplasty to reduce the height of the nose bridge. Create a more delicate and balanced profile while maintaining natural facial harmony. The bridge should appear slightly lower but still look natural and proportional."
     },
     "Tip Refinement": {
         "description": "Refine nose tip for better definition",
-        "prompt": "Refine the nose tip through rhinoplasty to create better definition and projection. Make it more elegant while keeping it natural-looking."
+        "prompt": "Refine the nose tip through rhinoplasty to create better definition and projection. Make it more elegant while keeping it natural-looking. The tip should be slightly more defined but not overly sculpted."
     },
     "Nose Narrowing": {
         "description": "Reduce nose width for better proportion",
-        "prompt": "Apply rhinoplasty to narrow the nose width, creating better facial proportions while maintaining a natural appearance."
+        "prompt": "Apply rhinoplasty to narrow the nose width, creating better facial proportions. The nose should appear slightly narrower while maintaining natural appearance and avoiding any artificial look."
     },
     "Crooked Correction": {
         "description": "Correct nose deviation for better symmetry",
-        "prompt": "Correct any nose deviation through rhinoplasty to improve facial symmetry while maintaining natural appearance."
+        "prompt": "Correct any nose deviation through rhinoplasty to improve facial symmetry. The nose should appear straight and centered while maintaining natural appearance and avoiding any signs of artificial correction."
     },
     "Combined Enhancement": {
         "description": "Comprehensive nose enhancement combining multiple effects",
-        "prompt": "Apply comprehensive rhinoplasty to enhance the nose's appearance, combining multiple refinements while ensuring a natural and balanced result."
+        "prompt": "Apply comprehensive rhinoplasty combining multiple refinements. The nose should appear more refined, proportional, and balanced while maintaining a completely natural appearance. All changes should look like the result of skilled surgical intervention."
     }
 }
 
@@ -294,46 +281,38 @@ def apply_combined_enhancement(image, intensity=0.35):
     
     return result
 
-def process_image_with_vertex_ai(image, effect):
-    """Process an image with Vertex AI's image generation model."""
+def process_image_with_api(image, effect):
+    """Process an image using our API endpoint."""
     try:
-        # Initialize Vertex AI
-        model = init_vertex_ai()
-        
-        # Convert image to bytes
+        # Convert image to base64
         img_byte_arr = io.BytesIO()
         image.save(img_byte_arr, format='JPEG')
         img_byte_arr = img_byte_arr.getvalue()
+        image_base64 = base64.b64encode(img_byte_arr).decode('utf-8')
         
-        # Create image part for Vertex AI
-        image_part = Part.from_data(data=img_byte_arr, mime_type='image/jpeg')
+        # Prepare the request
+        url = "http://localhost:5000/process-image"
+        payload = {
+            "image": f"data:image/jpeg;base64,{image_base64}",
+            "effect": effect
+        }
         
-        # Get the prompt for the selected effect
-        prompt = RHINOPLASTY_OPTIONS[effect]["prompt"]
+        # Make the request
+        response = requests.post(url, json=payload)
         
-        # Generate content with Vertex AI
-        generation_config = GenerationConfig(
-            max_output_tokens=2048,
-            temperature=0.4,
-            top_p=0.8,
-            top_k=40
-        )
+        if response.status_code == 200:
+            result = response.json()
+            if result.get('success'):
+                # Decode the result image
+                result_image_data = result['processed_image'].split(',')[1]
+                result_image_bytes = base64.b64decode(result_image_data)
+                return Image.open(io.BytesIO(result_image_bytes))
         
-        response = model.generate_content(
-            [prompt, image_part],
-            generation_config=generation_config
-        )
-        
-        if response.text:
-            # Convert the response to an image
-            # Note: This is a placeholder. In a real implementation, you would need to
-            # process the response.text to extract the generated image data
-            return image  # For now, return the original image
-            
+        # If something went wrong, return the original image
         return image
         
     except Exception as e:
-        print(f"Error processing image with Vertex AI: {e}")
+        print(f"Error processing image with API: {e}")
         return image
 
 @app.route('/')
@@ -351,8 +330,8 @@ def process_image():
         image_bytes = base64.b64decode(image_data.split(',')[1])
         image = Image.open(io.BytesIO(image_bytes))
         
-        # Process image with Vertex AI
-        result = process_image_with_vertex_ai(image, effect)
+        # Process image with API
+        result = process_image_with_api(image, effect)
         
         # Convert result to base64
         img_byte_arr = io.BytesIO()
@@ -384,8 +363,8 @@ def main():
         
         if st.button("Apply Effect"):
             with st.spinner("Processing..."):
-                # Process image with Vertex AI
-                result = process_image_with_vertex_ai(image, selected_effect)
+                # Process image with API
+                result = process_image_with_api(image, selected_effect)
                 
                 # Display result
                 st.image(result, caption=f"After {selected_effect}", use_column_width=True)
