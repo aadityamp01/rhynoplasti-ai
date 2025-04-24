@@ -315,14 +315,27 @@ def process_image_with_api(image, effect):
         return result
     else:
         # Fallback to local processing
-        return process_image(image, effect)
+        if effect == "Natural Refinement":
+            return apply_natural_refinement(image)
+        elif effect == "Bridge Reduction":
+            return apply_bridge_reduction(image)
+        elif effect == "Tip Refinement":
+            return apply_tip_refinement(image)
+        elif effect == "Nose Narrowing":
+            return apply_nose_narrowing(image)
+        elif effect == "Crooked Correction":
+            return apply_crooked_correction(image)
+        elif effect == "Combined Enhancement":
+            return apply_combined_enhancement(image)
+        else:
+            return image
 
 @app.route('/')
 def index():
     return render_template('index.html')
 
 @app.route('/process_image', methods=['POST'])
-def process_image():
+def process_image_api():
     data = request.json
     image_str = data.get('image')
     effect = data.get('effect')
@@ -336,7 +349,7 @@ def process_image():
     image = cv2.imdecode(image_array, cv2.IMREAD_COLOR)
     
     # Process image
-    result = process_image(image, effect)
+    result = process_image_with_api(image, effect)
     
     # Encode result
     _, buffer = cv2.imencode('.jpg', result)
@@ -375,7 +388,20 @@ def main():
                 img = cv2.cvtColor(np.array(image), cv2.COLOR_RGB2BGR)
                 
                 # Process image
-                result = process_image(img, selected_effect)
+                if selected_effect == "Natural Refinement":
+                    result = apply_natural_refinement(img)
+                elif selected_effect == "Bridge Reduction":
+                    result = apply_bridge_reduction(img)
+                elif selected_effect == "Tip Refinement":
+                    result = apply_tip_refinement(img)
+                elif selected_effect == "Nose Narrowing":
+                    result = apply_nose_narrowing(img)
+                elif selected_effect == "Crooked Correction":
+                    result = apply_crooked_correction(img)
+                elif selected_effect == "Combined Enhancement":
+                    result = apply_combined_enhancement(img)
+                else:
+                    result = img
                 
                 # Convert back to PIL Image
                 result_rgb = cv2.cvtColor(result, cv2.COLOR_BGR2RGB)
