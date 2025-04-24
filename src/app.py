@@ -35,6 +35,34 @@ st.set_page_config(
     layout="wide"
 )
 
+# Rhinoplasty options
+RHINOPLASTY_OPTIONS = {
+    "Natural Refinement": {
+        "description": "Subtle nose refinement for a more balanced profile",
+        "prompt": "Apply subtle rhinoplasty to make the nose more refined and proportional."
+    },
+    "Bridge Reduction": {
+        "description": "Reduce nose bridge height for a more delicate profile",
+        "prompt": "Perform rhinoplasty to reduce the height of the nose bridge."
+    },
+    "Tip Refinement": {
+        "description": "Refine nose tip for better definition",
+        "prompt": "Refine the nose tip through rhinoplasty to create better definition."
+    },
+    "Nose Narrowing": {
+        "description": "Reduce nose width for better proportion",
+        "prompt": "Apply rhinoplasty to narrow the nose width."
+    },
+    "Crooked Correction": {
+        "description": "Correct nose deviation for better symmetry",
+        "prompt": "Correct any nose deviation through rhinoplasty."
+    },
+    "Combined Enhancement": {
+        "description": "Comprehensive nose enhancement combining multiple effects",
+        "prompt": "Apply comprehensive rhinoplasty combining multiple refinements."
+    }
+}
+
 # Custom CSS
 st.markdown("""
     <style>
@@ -57,36 +85,8 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# Rhinoplasty options
-RHINOPLASTY_OPTIONS = {
-    "Natural Refinement": {
-        "description": "Subtle nose refinement for a more balanced profile",
-        "prompt": "Apply subtle rhinoplasty to make the nose more refined and proportional. Focus on gentle contouring and slight reduction in size. Maintain natural facial features and skin texture. The result should look like a natural, post-surgery outcome."
-    },
-    "Bridge Reduction": {
-        "description": "Reduce nose bridge height for a more delicate profile",
-        "prompt": "Perform rhinoplasty to reduce the height of the nose bridge. Create a more delicate and balanced profile while maintaining natural facial harmony. The bridge should appear slightly lower but still look natural and proportional."
-    },
-    "Tip Refinement": {
-        "description": "Refine nose tip for better definition",
-        "prompt": "Refine the nose tip through rhinoplasty to create better definition and projection. Make it more elegant while keeping it natural-looking. The tip should be slightly more defined but not overly sculpted."
-    },
-    "Nose Narrowing": {
-        "description": "Reduce nose width for better proportion",
-        "prompt": "Apply rhinoplasty to narrow the nose width, creating better facial proportions. The nose should appear slightly narrower while maintaining natural appearance and avoiding any artificial look."
-    },
-    "Crooked Correction": {
-        "description": "Correct nose deviation for better symmetry",
-        "prompt": "Correct any nose deviation through rhinoplasty to improve facial symmetry. The nose should appear straight and centered while maintaining natural appearance and avoiding any signs of artificial correction."
-    },
-    "Combined Enhancement": {
-        "description": "Comprehensive nose enhancement combining multiple effects",
-        "prompt": "Apply comprehensive rhinoplasty combining multiple refinements. The nose should appear more refined, proportional, and balanced while maintaining a completely natural appearance. All changes should look like the result of skilled surgical intervention."
-    }
-}
-
 def run_flask():
-    """Run the Flask server in a separate thread."""
+    """Run Flask app in a separate thread."""
     app.run(host='0.0.0.0', port=5000)
 
 def detect_nose_landmarks(image):
@@ -132,129 +132,132 @@ def create_nose_mask(image, landmarks):
     return mask
 
 def apply_natural_refinement(image, intensity=0.3):
-    """Apply natural nose refinement."""
+    """Apply natural refinement effect to the nose."""
     landmarks = detect_nose_landmarks(image)
-    if not landmarks:
+    if landmarks is None:
         return image
     
     mask = create_nose_mask(image, landmarks)
     
-    # Create a copy of the image
-    result = image.copy()
+    # Convert to LAB color space
+    lab = cv2.cvtColor(image, cv2.COLOR_BGR2LAB)
+    l, a, b = cv2.split(lab)
     
-    # Apply subtle brightness and contrast adjustments
-    alpha = 1.0 + (intensity * 0.2)  # Contrast
-    beta = intensity * 10  # Brightness
+    # Enhance brightness and contrast
+    clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8,8))
+    l = clahe.apply(l)
     
-    # Apply adjustments only to the nose region
-    result = cv2.convertScaleAbs(result, alpha=alpha, beta=beta)
+    # Merge channels back
+    lab = cv2.merge([l, a, b])
+    result = cv2.cvtColor(lab, cv2.COLOR_LAB2BGR)
+    
+    # Apply only to nose region
     result = cv2.bitwise_and(result, result, mask=mask)
-    
-    # Blend with original image
-    result = cv2.addWeighted(image, 1 - intensity, result, intensity, 0)
+    image = cv2.bitwise_and(image, image, mask=~mask)
+    result = cv2.add(image, result)
     
     return result
 
 def apply_bridge_reduction(image, intensity=0.4):
-    """Apply nose bridge reduction."""
+    """Apply bridge reduction effect to the nose."""
     landmarks = detect_nose_landmarks(image)
-    if not landmarks:
+    if landmarks is None:
         return image
     
     mask = create_nose_mask(image, landmarks)
     
-    # Create a copy of the image
-    result = image.copy()
+    # Convert to LAB color space
+    lab = cv2.cvtColor(image, cv2.COLOR_BGR2LAB)
+    l, a, b = cv2.split(lab)
     
-    # Apply darkening effect to the bridge
-    darkening = np.ones_like(image) * (1 - intensity * 0.5)
-    result = cv2.multiply(result, darkening)
+    # Darken the bridge area
+    l = cv2.addWeighted(l, 0.8, np.zeros_like(l), 0.2, 0)
     
-    # Apply only to the nose region
+    # Merge channels back
+    lab = cv2.merge([l, a, b])
+    result = cv2.cvtColor(lab, cv2.COLOR_LAB2BGR)
+    
+    # Apply only to nose region
     result = cv2.bitwise_and(result, result, mask=mask)
-    
-    # Blend with original image
-    result = cv2.addWeighted(image, 1 - intensity, result, intensity, 0)
+    image = cv2.bitwise_and(image, image, mask=~mask)
+    result = cv2.add(image, result)
     
     return result
 
 def apply_tip_refinement(image, intensity=0.35):
-    """Apply nose tip refinement."""
+    """Apply tip refinement effect to the nose."""
     landmarks = detect_nose_landmarks(image)
-    if not landmarks:
+    if landmarks is None:
         return image
     
-    # Create a mask for just the tip
+    # Create mask for just the tip
     tip_mask = np.zeros(image.shape[:2], dtype=np.uint8)
     tip_point = landmarks[5]  # Nose tip landmark
     x = int(tip_point.x * image.shape[1])
     y = int(tip_point.y * image.shape[0])
     cv2.circle(tip_mask, (x, y), 20, 255, -1)
     
-    # Create a copy of the image
-    result = image.copy()
+    # Convert to LAB color space
+    lab = cv2.cvtColor(image, cv2.COLOR_BGR2LAB)
+    l, a, b = cv2.split(lab)
     
-    # Apply brightening effect to the tip
-    brightening = np.ones_like(image) * (1 + intensity * 0.3)
-    result = cv2.multiply(result, brightening)
+    # Brighten the tip area
+    l = cv2.addWeighted(l, 1.2, np.ones_like(l) * 255, 0.1, 0)
     
-    # Apply only to the tip region
+    # Merge channels back
+    lab = cv2.merge([l, a, b])
+    result = cv2.cvtColor(lab, cv2.COLOR_LAB2BGR)
+    
+    # Apply only to tip region
     result = cv2.bitwise_and(result, result, mask=tip_mask)
-    
-    # Blend with original image
-    result = cv2.addWeighted(image, 1 - intensity, result, intensity, 0)
+    image = cv2.bitwise_and(image, image, mask=~tip_mask)
+    result = cv2.add(image, result)
     
     return result
 
 def apply_nose_narrowing(image, intensity=0.4):
     """Apply nose narrowing effect."""
     landmarks = detect_nose_landmarks(image)
-    if not landmarks:
+    if landmarks is None:
         return image
     
     mask = create_nose_mask(image, landmarks)
+    height, width = image.shape[:2]
     
-    # Create a copy of the image
-    result = image.copy()
+    # Apply warping to narrow the nose
+    map_x = np.zeros((height, width), np.float32)
+    map_y = np.zeros((height, width), np.float32)
     
-    # Get nose width points
-    left_point = landmarks[0]
-    right_point = landmarks[-1]
+    center_x = width // 2
+    for y in range(height):
+        for x in range(width):
+            if mask[y, x] > 0:
+                # Calculate distance from center
+                dx = x - center_x
+                # Apply narrowing effect
+                map_x[y, x] = x - dx * 0.2
+                map_y[y, x] = y
+            else:
+                map_x[y, x] = x
+                map_y[y, x] = y
     
-    # Calculate center and width
-    center_x = (left_point.x + right_point.x) / 2
-    width = right_point.x - left_point.x
+    result = cv2.remap(image, map_x, map_y, cv2.INTER_LINEAR)
     
-    # Create a transformation matrix for narrowing
-    matrix = np.float32([[1, 0, 0],
-                        [0, 1, 0],
-                        [0, 0, 1]])
-    
-    # Apply narrowing transformation
-    matrix[0, 0] = 1 - (intensity * 0.3)  # Scale factor
-    matrix[0, 2] = center_x * (1 - matrix[0, 0])  # Offset
-    
-    # Apply transformation
-    result = cv2.warpAffine(result, matrix[:2], (image.shape[1], image.shape[0]))
-    
-    # Apply only to the nose region
+    # Apply only to nose region
     result = cv2.bitwise_and(result, result, mask=mask)
-    
-    # Blend with original image
-    result = cv2.addWeighted(image, 1 - intensity, result, intensity, 0)
+    image = cv2.bitwise_and(image, image, mask=~mask)
+    result = cv2.add(image, result)
     
     return result
 
 def apply_crooked_correction(image, intensity=0.45):
-    """Apply crooked nose correction."""
+    """Apply crooked nose correction effect."""
     landmarks = detect_nose_landmarks(image)
-    if not landmarks:
+    if landmarks is None:
         return image
     
     mask = create_nose_mask(image, landmarks)
-    
-    # Create a copy of the image
-    result = image.copy()
+    height, width = image.shape[:2]
     
     # Get nose bridge points
     bridge_points = landmarks[:5]
@@ -265,68 +268,54 @@ def apply_crooked_correction(image, intensity=0.45):
     angle = np.arctan2(end_point.y - start_point.y, end_point.x - start_point.x)
     
     # Create a transformation matrix for rotation
-    center = (image.shape[1] / 2, image.shape[0] / 2)
-    matrix = cv2.getRotationMatrix2D(center, -angle * 180 / np.pi * intensity, 1.0)
+    center = (width // 2, height // 2)
+    matrix = cv2.getRotationMatrix2D(center, -angle * 180 / np.pi * 0.5, 1.0)
     
     # Apply rotation
-    result = cv2.warpAffine(result, matrix, (image.shape[1], image.shape[0]))
+    result = cv2.warpAffine(image, matrix, (width, height))
     
-    # Apply only to the nose region
+    # Apply only to nose region
     result = cv2.bitwise_and(result, result, mask=mask)
-    
-    # Blend with original image
-    result = cv2.addWeighted(image, 1 - intensity, result, intensity, 0)
+    image = cv2.bitwise_and(image, image, mask=~mask)
+    result = cv2.add(image, result)
     
     return result
 
 def apply_combined_enhancement(image, intensity=0.35):
-    """Apply combined nose enhancement."""
-    # Apply all effects with reduced intensity
-    result = apply_natural_refinement(image, intensity * 0.8)
-    result = apply_bridge_reduction(result, intensity * 0.8)
-    result = apply_tip_refinement(result, intensity * 0.8)
-    result = apply_nose_narrowing(result, intensity * 0.8)
-    result = apply_crooked_correction(result, intensity * 0.8)
-    
+    """Apply all effects with reduced intensity."""
+    result = image.copy()
+    result = apply_natural_refinement(result)
+    result = apply_bridge_reduction(result)
+    result = apply_tip_refinement(result)
+    result = apply_nose_narrowing(result)
+    result = apply_crooked_correction(result)
     return result
 
 def process_image_with_api(image, effect):
-    """Process an image using our API endpoint."""
-    try:
-        # Convert image to base64
-        img_byte_arr = io.BytesIO()
-        image.save(img_byte_arr, format='JPEG')
-        img_byte_arr = img_byte_arr.getvalue()
-        image_base64 = base64.b64encode(img_byte_arr).decode('utf-8')
-        
-        # Prepare the request
-        url = "http://localhost:5000/api/process-image"
-        payload = {
-            "image": f"data:image/jpeg;base64,{image_base64}",
-            "effect": effect
-        }
-        
-        # Make the request
-        response = requests.post(url, json=payload)
-        
-        if response.status_code == 200:
-            result = response.json()
-            if result.get('success'):
-                # Decode the result image
-                result_image_data = result['processed_image'].split(',')[1]
-                result_image_bytes = base64.b64decode(result_image_data)
-                return Image.open(io.BytesIO(result_image_bytes))
-            else:
-                st.error(f"API Error: {result.get('error', 'Unknown error')}")
-        else:
-            st.error(f"API Error: Status code {response.status_code}")
-        
-        # If something went wrong, return the original image
-        return image
-        
-    except Exception as e:
-        st.error(f"Error processing image with API: {str(e)}")
-        return image
+    """Process image using the API endpoint."""
+    # Convert image to base64
+    _, buffer = cv2.imencode('.jpg', image)
+    img_str = base64.b64encode(buffer).decode('utf-8')
+    
+    # Prepare request data
+    data = {
+        'image': img_str,
+        'effect': effect
+    }
+    
+    # Send request to API
+    response = requests.post('http://localhost:5000/api/process_image', json=data)
+    
+    if response.status_code == 200:
+        # Decode response image
+        result_str = response.json()['result']
+        result_bytes = base64.b64decode(result_str)
+        result_array = np.frombuffer(result_bytes, np.uint8)
+        result = cv2.imdecode(result_array, cv2.IMREAD_COLOR)
+        return result
+    else:
+        # Fallback to local processing
+        return process_image(image, effect)
 
 @app.route('/')
 def index():
@@ -334,28 +323,26 @@ def index():
 
 @app.route('/process_image', methods=['POST'])
 def process_image():
-    try:
-        # Get image data from request
-        image_data = request.json['image']
-        effect = request.json['effect']
-        
-        # Decode base64 image
-        image_bytes = base64.b64decode(image_data.split(',')[1])
-        image = Image.open(io.BytesIO(image_bytes))
-        
-        # Process image with API
-        result = process_image_with_api(image, effect)
-        
-        # Convert result to base64
-        img_byte_arr = io.BytesIO()
-        result.save(img_byte_arr, format='JPEG')
-        img_byte_arr = img_byte_arr.getvalue()
-        result_base64 = base64.b64encode(img_byte_arr).decode('utf-8')
-        
-        return jsonify({"result": f"data:image/jpeg;base64,{result_base64}"})
+    data = request.json
+    image_str = data.get('image')
+    effect = data.get('effect')
     
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
+    if not image_str or not effect:
+        return jsonify({'error': 'Missing image or effect'}), 400
+    
+    # Decode image
+    image_bytes = base64.b64decode(image_str)
+    image_array = np.frombuffer(image_bytes, np.uint8)
+    image = cv2.imdecode(image_array, cv2.IMREAD_COLOR)
+    
+    # Process image
+    result = process_image(image, effect)
+    
+    # Encode result
+    _, buffer = cv2.imencode('.jpg', result)
+    result_str = base64.b64encode(buffer).decode('utf-8')
+    
+    return jsonify({'result': result_str})
 
 def main():
     # Start Flask server in a separate thread
@@ -379,17 +366,27 @@ def main():
             list(RHINOPLASTY_OPTIONS.keys())
         )
         
+        # Show effect description
+        st.write(RHINOPLASTY_OPTIONS[selected_effect]["description"])
+        
         if st.button("Apply Effect"):
             with st.spinner("Processing..."):
-                # Process image with API
-                result = process_image_with_api(image, selected_effect)
+                # Convert PIL Image to OpenCV format
+                img = cv2.cvtColor(np.array(image), cv2.COLOR_RGB2BGR)
+                
+                # Process image
+                result = process_image(img, selected_effect)
+                
+                # Convert back to PIL Image
+                result_rgb = cv2.cvtColor(result, cv2.COLOR_BGR2RGB)
+                result_pil = Image.fromarray(result_rgb)
                 
                 # Display result
-                st.image(result, caption=f"After {selected_effect}", use_column_width=True)
+                st.image(result_pil, caption=f"After {selected_effect}", use_column_width=True)
                 
                 # Add download button
                 img_byte_arr = io.BytesIO()
-                result.save(img_byte_arr, format='JPEG')
+                result_pil.save(img_byte_arr, format='JPEG')
                 img_byte_arr = img_byte_arr.getvalue()
                 
                 st.download_button(

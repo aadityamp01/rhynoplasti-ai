@@ -5,8 +5,9 @@ import sys
 project_root = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, project_root)
 
-import streamlit as st
-import src.app as app  # Changed to import the module directly
+# Import the Streamlit app
+import streamlit_app
 
 if __name__ == "__main__":
-    app.main() 
+    # This will be used when running locally with 'python main.py'
+    streamlit_app.main() 
