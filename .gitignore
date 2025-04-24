@@ -24,11 +24,12 @@ lib64/
 parts/
 sdist/
 var/
+wheels/
 *.egg-info/
 .installed.cfg
 *.egg
 venv/
-.venv/
+ENV/
 
 # Node.js
 node_modules/
@@ -52,6 +53,7 @@ yarn-error.log
 # Streamlit
 .streamlit/
 !.streamlit/config.toml
+.streamlit/secrets.toml
 
 # Logs
 logs/
@@ -60,9 +62,6 @@ logs/
 # Temporary files
 tmp/
 temp/
-
-# Virtual Environment
-ENV/
 
 # Google Cloud
 *.json
