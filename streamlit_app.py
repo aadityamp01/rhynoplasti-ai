@@ -22,6 +22,7 @@ from src.app import (
     apply_nose_narrowing,
     apply_crooked_correction,
     apply_combined_enhancement,
+    process_image_with_api,
     RHINOPLASTY_OPTIONS
 )
 
