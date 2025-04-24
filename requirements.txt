@@ -2,7 +2,7 @@ streamlit==1.32.0
 numpy==1.26.4
 Pillow==10.2.0
 opencv-python-headless==4.9.0.80
-mediapipe==0.10.9
+mediapipe==0.10.21
 google-cloud-aiplatform>=1.38.1
 vertexai>=0.0.1
 flask==3.0.2
@@ -10,7 +10,7 @@ flask-cors==4.0.0
 pygments>=2.19.1
 mdurl>=0.1.2
 markdown-it-py>=3.0.0
-rich>=14.0.0
+rich>=10.14.0,<14.0.0
 protobuf>=4.25.1
 google-api-core>=2.15.0
 google-auth>=2.27.0
