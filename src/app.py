@@ -63,28 +63,6 @@ RHINOPLASTY_OPTIONS = {
     }
 }
 
-# Custom CSS
-st.markdown("""
-    <style>
-    .stApp {
-        max-width: 1200px;
-        margin: 0 auto;
-    }
-    .effect-button {
-        background-color: #4CAF50;
-        color: white;
-        padding: 10px 20px;
-        border: none;
-        border-radius: 5px;
-        cursor: pointer;
-        margin: 5px;
-    }
-    .effect-button:hover {
-        background-color: #45a049;
-    }
-    </style>
-""", unsafe_allow_html=True)
-
 def run_flask():
     """Run Flask app in a separate thread."""
     app.run(host='0.0.0.0', port=5000)
@@ -355,72 +333,4 @@ def process_image_api():
     _, buffer = cv2.imencode('.jpg', result)
     result_str = base64.b64encode(buffer).decode('utf-8')
     
-    return jsonify({'result': result_str})
-
-def main():
-    # Start Flask server in a separate thread
-    flask_thread = threading.Thread(target=run_flask)
-    flask_thread.daemon = True
-    flask_thread.start()
-    
-    st.title("AI Rhinoplasty Simulator")
-    
-    # File uploader
-    uploaded_file = st.file_uploader("Choose an image...", type=["jpg", "jpeg", "png"])
-    
-    if uploaded_file is not None:
-        # Display original image
-        image = Image.open(uploaded_file)
-        st.image(image, caption="Original Image", use_column_width=True)
-        
-        # Effect selection
-        selected_effect = st.selectbox(
-            "Select Rhinoplasty Effect",
-            list(RHINOPLASTY_OPTIONS.keys())
-        )
-        
-        # Show effect description
-        st.write(RHINOPLASTY_OPTIONS[selected_effect]["description"])
-        
-        if st.button("Apply Effect"):
-            with st.spinner("Processing..."):
-                # Convert PIL Image to OpenCV format
-                img = cv2.cvtColor(np.array(image), cv2.COLOR_RGB2BGR)
-                
-                # Process image
-                if selected_effect == "Natural Refinement":
-                    result = apply_natural_refinement(img)
-                elif selected_effect == "Bridge Reduction":
-                    result = apply_bridge_reduction(img)
-                elif selected_effect == "Tip Refinement":
-                    result = apply_tip_refinement(img)
-                elif selected_effect == "Nose Narrowing":
-                    result = apply_nose_narrowing(img)
-                elif selected_effect == "Crooked Correction":
-                    result = apply_crooked_correction(img)
-                elif selected_effect == "Combined Enhancement":
-                    result = apply_combined_enhancement(img)
-                else:
-                    result = img
-                
-                # Convert back to PIL Image
-                result_rgb = cv2.cvtColor(result, cv2.COLOR_BGR2RGB)
-                result_pil = Image.fromarray(result_rgb)
-                
-                # Display result
-                st.image(result_pil, caption=f"After {selected_effect}", use_column_width=True)
-                
-                # Add download button
-                img_byte_arr = io.BytesIO()
-                result_pil.save(img_byte_arr, format='JPEG')
-                img_byte_arr = img_byte_arr.getvalue()
-                
-                st.download_button(
-                    label="Download Result",
-                    data=img_byte_arr,
-                    file_name="rhinoplasty_result.jpg",
-                    mime="image/jpeg"
-                )
-
-if __name__ == "__main__":
-    main()
+    return jsonify({'result': result_str}) 
