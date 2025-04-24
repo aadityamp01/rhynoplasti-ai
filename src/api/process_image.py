@@ -125,7 +125,7 @@ def get_nose_landmarks(image):
     return nose_landmarks
 
 def create_nose_mask(image, landmarks):
-    """Create a mask for the nose region."""
+    """Create a mask for the nose region with smooth edges."""
     mask = np.zeros(image.shape[:2], dtype=np.uint8)
     if landmarks:
         points = []
@@ -136,11 +136,14 @@ def create_nose_mask(image, landmarks):
         
         points = np.array(points, dtype=np.int32)
         cv2.fillConvexPoly(mask, points, 255)
+        
+        # Apply Gaussian blur to create smooth edges
+        mask = cv2.GaussianBlur(mask, (21, 21), 0)
     
     return mask
 
-def apply_natural_refinement(image, intensity=0.3):
-    """Apply natural refinement effect to the nose."""
+def apply_natural_refinement(image, intensity=0.15):
+    """Apply subtle natural refinement effect to the nose."""
     landmarks = get_nose_landmarks(image)
     if landmarks is None:
         return image
@@ -151,23 +154,27 @@ def apply_natural_refinement(image, intensity=0.3):
     lab = cv2.cvtColor(image, cv2.COLOR_BGR2LAB)
     l, a, b = cv2.split(lab)
     
-    # Enhance brightness and contrast
-    clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8,8))
+    # Apply subtle contrast enhancement
+    clahe = cv2.createCLAHE(clipLimit=1.5, tileGridSize=(8,8))
     l = clahe.apply(l)
     
     # Merge channels back
     lab = cv2.merge([l, a, b])
     result = cv2.cvtColor(lab, cv2.COLOR_LAB2BGR)
     
-    # Apply only to nose region
+    # Blend the result with the original image
+    alpha = intensity
+    result = cv2.addWeighted(image, 1-alpha, result, alpha, 0)
+    
+    # Apply only to nose region with smooth blending
     result = cv2.bitwise_and(result, result, mask=mask)
     image = cv2.bitwise_and(image, image, mask=~mask)
     result = cv2.add(image, result)
     
     return result
 
-def apply_bridge_reduction(image, intensity=0.4):
-    """Apply bridge reduction effect to the nose."""
+def apply_bridge_reduction(image, intensity=0.2):
+    """Apply subtle bridge reduction effect to the nose."""
     landmarks = get_nose_landmarks(image)
     if landmarks is None:
         return image
@@ -178,22 +185,26 @@ def apply_bridge_reduction(image, intensity=0.4):
     lab = cv2.cvtColor(image, cv2.COLOR_BGR2LAB)
     l, a, b = cv2.split(lab)
     
-    # Darken the bridge area
-    l = cv2.addWeighted(l, 0.8, np.zeros_like(l), 0.2, 0)
+    # Apply subtle darkening to the bridge area
+    l = cv2.addWeighted(l, 0.9, np.zeros_like(l), 0.1, 0)
     
     # Merge channels back
     lab = cv2.merge([l, a, b])
     result = cv2.cvtColor(lab, cv2.COLOR_LAB2BGR)
     
-    # Apply only to nose region
+    # Blend the result with the original image
+    alpha = intensity
+    result = cv2.addWeighted(image, 1-alpha, result, alpha, 0)
+    
+    # Apply only to nose region with smooth blending
     result = cv2.bitwise_and(result, result, mask=mask)
     image = cv2.bitwise_and(image, image, mask=~mask)
     result = cv2.add(image, result)
     
     return result
 
-def apply_tip_refinement(image, intensity=0.35):
-    """Apply tip refinement effect to the nose."""
+def apply_tip_refinement(image, intensity=0.2):
+    """Apply subtle tip refinement effect to the nose."""
     landmarks = get_nose_landmarks(image)
     if landmarks is None:
         return image
@@ -203,28 +214,35 @@ def apply_tip_refinement(image, intensity=0.35):
     tip_point = landmarks[5]  # Nose tip landmark
     x = int(tip_point.x * image.shape[1])
     y = int(tip_point.y * image.shape[0])
-    cv2.circle(tip_mask, (x, y), 20, 255, -1)
+    cv2.circle(tip_mask, (x, y), 15, 255, -1)
+    
+    # Apply Gaussian blur to create smooth edges
+    tip_mask = cv2.GaussianBlur(tip_mask, (21, 21), 0)
     
     # Convert to LAB color space
     lab = cv2.cvtColor(image, cv2.COLOR_BGR2LAB)
     l, a, b = cv2.split(lab)
     
-    # Brighten the tip area
-    l = cv2.addWeighted(l, 1.2, np.ones_like(l) * 255, 0.1, 0)
+    # Apply subtle brightening to the tip area
+    l = cv2.addWeighted(l, 1.1, np.ones_like(l) * 255, 0.05, 0)
     
     # Merge channels back
     lab = cv2.merge([l, a, b])
     result = cv2.cvtColor(lab, cv2.COLOR_LAB2BGR)
     
-    # Apply only to tip region
+    # Blend the result with the original image
+    alpha = intensity
+    result = cv2.addWeighted(image, 1-alpha, result, alpha, 0)
+    
+    # Apply only to tip region with smooth blending
     result = cv2.bitwise_and(result, result, mask=tip_mask)
     image = cv2.bitwise_and(image, image, mask=~tip_mask)
     result = cv2.add(image, result)
     
     return result
 
-def apply_nose_narrowing(image, intensity=0.4):
-    """Apply nose narrowing effect."""
+def apply_nose_narrowing(image, intensity=0.2):
+    """Apply subtle nose narrowing effect."""
     landmarks = get_nose_landmarks(image)
     if landmarks is None:
         return image
@@ -232,7 +250,7 @@ def apply_nose_narrowing(image, intensity=0.4):
     mask = create_nose_mask(image, landmarks)
     height, width = image.shape[:2]
     
-    # Apply warping to narrow the nose
+    # Apply subtle warping to narrow the nose
     map_x = np.zeros((height, width), np.float32)
     map_y = np.zeros((height, width), np.float32)
     
@@ -242,8 +260,8 @@ def apply_nose_narrowing(image, intensity=0.4):
             if mask[y, x] > 0:
                 # Calculate distance from center
                 dx = x - center_x
-                # Apply narrowing effect
-                map_x[y, x] = x - dx * 0.2
+                # Apply subtle narrowing effect
+                map_x[y, x] = x - dx * 0.1
                 map_y[y, x] = y
             else:
                 map_x[y, x] = x
@@ -251,15 +269,19 @@ def apply_nose_narrowing(image, intensity=0.4):
     
     result = cv2.remap(image, map_x, map_y, cv2.INTER_LINEAR)
     
-    # Apply only to nose region
+    # Blend the result with the original image
+    alpha = intensity
+    result = cv2.addWeighted(image, 1-alpha, result, alpha, 0)
+    
+    # Apply only to nose region with smooth blending
     result = cv2.bitwise_and(result, result, mask=mask)
     image = cv2.bitwise_and(image, image, mask=~mask)
     result = cv2.add(image, result)
     
     return result
 
-def apply_crooked_correction(image, intensity=0.45):
-    """Apply crooked nose correction effect."""
+def apply_crooked_correction(image, intensity=0.25):
+    """Apply subtle crooked nose correction effect."""
     landmarks = get_nose_landmarks(image)
     if landmarks is None:
         return image
@@ -275,28 +297,32 @@ def apply_crooked_correction(image, intensity=0.45):
     end_point = bridge_points[-1]
     angle = np.arctan2(end_point.y - start_point.y, end_point.x - start_point.x)
     
-    # Create a transformation matrix for rotation
+    # Create a transformation matrix for subtle rotation
     center = (width // 2, height // 2)
-    matrix = cv2.getRotationMatrix2D(center, -angle * 180 / np.pi * 0.5, 1.0)
+    matrix = cv2.getRotationMatrix2D(center, -angle * 180 / np.pi * 0.25, 1.0)
     
     # Apply rotation
     result = cv2.warpAffine(image, matrix, (width, height))
     
-    # Apply only to nose region
+    # Blend the result with the original image
+    alpha = intensity
+    result = cv2.addWeighted(image, 1-alpha, result, alpha, 0)
+    
+    # Apply only to nose region with smooth blending
     result = cv2.bitwise_and(result, result, mask=mask)
     image = cv2.bitwise_and(image, image, mask=~mask)
     result = cv2.add(image, result)
     
     return result
 
-def apply_combined_enhancement(image, intensity=0.35):
-    """Apply all effects with reduced intensity."""
+def apply_combined_enhancement(image, intensity=0.15):
+    """Apply all effects with very reduced intensity."""
     result = image.copy()
-    result = apply_natural_refinement(result)
-    result = apply_bridge_reduction(result)
-    result = apply_tip_refinement(result)
-    result = apply_nose_narrowing(result)
-    result = apply_crooked_correction(result)
+    result = apply_natural_refinement(result, intensity=0.1)
+    result = apply_bridge_reduction(result, intensity=0.1)
+    result = apply_tip_refinement(result, intensity=0.1)
+    result = apply_nose_narrowing(result, intensity=0.1)
+    result = apply_crooked_correction(result, intensity=0.1)
     return result
 
 def decode_image(image_data):
