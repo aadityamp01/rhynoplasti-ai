@@ -7,6 +7,13 @@ import mediapipe as mp
 from PIL import Image
 import io
 
+# Set up Streamlit page config (must be the first Streamlit command)
+st.set_page_config(
+    page_title="AI Rhinoplasty Simulator",
+    page_icon="👃",
+    layout="wide"
+)
+
 # Add the project root directory to the Python path
 project_root = os.path.dirname(os.path.abspath(__file__))
 if project_root not in sys.path:
@@ -24,13 +31,6 @@ from src.app import (
     apply_combined_enhancement,
     process_image_with_api,
     RHINOPLASTY_OPTIONS
-)
-
-# Set up Streamlit page config
-st.set_page_config(
-    page_title="AI Rhinoplasty Simulator",
-    page_icon="👃",
-    layout="wide"
 )
 
 # Custom CSS
