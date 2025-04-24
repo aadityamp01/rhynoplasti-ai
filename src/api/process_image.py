@@ -8,8 +8,18 @@ import vertexai
 from vertexai.generative_models import GenerativeModel, Part
 import os
 import streamlit as st
+import mediapipe as mp
 
 api_bp = Blueprint('api', __name__)
+
+# Initialize MediaPipe Face Mesh
+mp_face_mesh = mp.solutions.face_mesh
+face_mesh = mp_face_mesh.FaceMesh(
+    static_image_mode=True,
+    max_num_faces=1,
+    min_detection_confidence=0.5,
+    min_tracking_confidence=0.5
+)
 
 # Initialize Vertex AI using Streamlit secrets
 try:
@@ -87,6 +97,208 @@ EFFECT_PROMPTS = {
     """
 }
 
+def get_nose_landmarks(image):
+    """Get nose landmarks using MediaPipe Face Mesh."""
+    # Convert to RGB
+    image_rgb = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+    
+    # Process the image
+    results = face_mesh.process(image_rgb)
+    
+    if not results.multi_face_landmarks:
+        return None
+    
+    # Get nose landmarks
+    nose_landmarks = []
+    for face_landmarks in results.multi_face_landmarks:
+        # Nose bridge points (27-31)
+        nose_bridge = [face_landmarks.landmark[i] for i in range(27, 32)]
+        # Nose tip point (4)
+        nose_tip = face_landmarks.landmark[4]
+        # Nostril points (129-134)
+        nostrils = [face_landmarks.landmark[i] for i in range(129, 135)]
+        
+        nose_landmarks.extend(nose_bridge)
+        nose_landmarks.append(nose_tip)
+        nose_landmarks.extend(nostrils)
+    
+    return nose_landmarks
+
+def create_nose_mask(image, landmarks):
+    """Create a mask for the nose region."""
+    mask = np.zeros(image.shape[:2], dtype=np.uint8)
+    if landmarks:
+        points = []
+        for landmark in landmarks:
+            x = int(landmark.x * image.shape[1])
+            y = int(landmark.y * image.shape[0])
+            points.append([x, y])
+        
+        points = np.array(points, dtype=np.int32)
+        cv2.fillConvexPoly(mask, points, 255)
+    
+    return mask
+
+def apply_natural_refinement(image, intensity=0.3):
+    """Apply natural refinement effect to the nose."""
+    landmarks = get_nose_landmarks(image)
+    if landmarks is None:
+        return image
+    
+    mask = create_nose_mask(image, landmarks)
+    
+    # Convert to LAB color space
+    lab = cv2.cvtColor(image, cv2.COLOR_BGR2LAB)
+    l, a, b = cv2.split(lab)
+    
+    # Enhance brightness and contrast
+    clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8,8))
+    l = clahe.apply(l)
+    
+    # Merge channels back
+    lab = cv2.merge([l, a, b])
+    result = cv2.cvtColor(lab, cv2.COLOR_LAB2BGR)
+    
+    # Apply only to nose region
+    result = cv2.bitwise_and(result, result, mask=mask)
+    image = cv2.bitwise_and(image, image, mask=~mask)
+    result = cv2.add(image, result)
+    
+    return result
+
+def apply_bridge_reduction(image, intensity=0.4):
+    """Apply bridge reduction effect to the nose."""
+    landmarks = get_nose_landmarks(image)
+    if landmarks is None:
+        return image
+    
+    mask = create_nose_mask(image, landmarks)
+    
+    # Convert to LAB color space
+    lab = cv2.cvtColor(image, cv2.COLOR_BGR2LAB)
+    l, a, b = cv2.split(lab)
+    
+    # Darken the bridge area
+    l = cv2.addWeighted(l, 0.8, np.zeros_like(l), 0.2, 0)
+    
+    # Merge channels back
+    lab = cv2.merge([l, a, b])
+    result = cv2.cvtColor(lab, cv2.COLOR_LAB2BGR)
+    
+    # Apply only to nose region
+    result = cv2.bitwise_and(result, result, mask=mask)
+    image = cv2.bitwise_and(image, image, mask=~mask)
+    result = cv2.add(image, result)
+    
+    return result
+
+def apply_tip_refinement(image, intensity=0.35):
+    """Apply tip refinement effect to the nose."""
+    landmarks = get_nose_landmarks(image)
+    if landmarks is None:
+        return image
+    
+    # Create mask for just the tip
+    tip_mask = np.zeros(image.shape[:2], dtype=np.uint8)
+    tip_point = landmarks[5]  # Nose tip landmark
+    x = int(tip_point.x * image.shape[1])
+    y = int(tip_point.y * image.shape[0])
+    cv2.circle(tip_mask, (x, y), 20, 255, -1)
+    
+    # Convert to LAB color space
+    lab = cv2.cvtColor(image, cv2.COLOR_BGR2LAB)
+    l, a, b = cv2.split(lab)
+    
+    # Brighten the tip area
+    l = cv2.addWeighted(l, 1.2, np.ones_like(l) * 255, 0.1, 0)
+    
+    # Merge channels back
+    lab = cv2.merge([l, a, b])
+    result = cv2.cvtColor(lab, cv2.COLOR_LAB2BGR)
+    
+    # Apply only to tip region
+    result = cv2.bitwise_and(result, result, mask=tip_mask)
+    image = cv2.bitwise_and(image, image, mask=~tip_mask)
+    result = cv2.add(image, result)
+    
+    return result
+
+def apply_nose_narrowing(image, intensity=0.4):
+    """Apply nose narrowing effect."""
+    landmarks = get_nose_landmarks(image)
+    if landmarks is None:
+        return image
+    
+    mask = create_nose_mask(image, landmarks)
+    height, width = image.shape[:2]
+    
+    # Apply warping to narrow the nose
+    map_x = np.zeros((height, width), np.float32)
+    map_y = np.zeros((height, width), np.float32)
+    
+    center_x = width // 2
+    for y in range(height):
+        for x in range(width):
+            if mask[y, x] > 0:
+                # Calculate distance from center
+                dx = x - center_x
+                # Apply narrowing effect
+                map_x[y, x] = x - dx * 0.2
+                map_y[y, x] = y
+            else:
+                map_x[y, x] = x
+                map_y[y, x] = y
+    
+    result = cv2.remap(image, map_x, map_y, cv2.INTER_LINEAR)
+    
+    # Apply only to nose region
+    result = cv2.bitwise_and(result, result, mask=mask)
+    image = cv2.bitwise_and(image, image, mask=~mask)
+    result = cv2.add(image, result)
+    
+    return result
+
+def apply_crooked_correction(image, intensity=0.45):
+    """Apply crooked nose correction effect."""
+    landmarks = get_nose_landmarks(image)
+    if landmarks is None:
+        return image
+    
+    mask = create_nose_mask(image, landmarks)
+    height, width = image.shape[:2]
+    
+    # Get nose bridge points
+    bridge_points = landmarks[:5]
+    
+    # Calculate the angle of deviation
+    start_point = bridge_points[0]
+    end_point = bridge_points[-1]
+    angle = np.arctan2(end_point.y - start_point.y, end_point.x - start_point.x)
+    
+    # Create a transformation matrix for rotation
+    center = (width // 2, height // 2)
+    matrix = cv2.getRotationMatrix2D(center, -angle * 180 / np.pi * 0.5, 1.0)
+    
+    # Apply rotation
+    result = cv2.warpAffine(image, matrix, (width, height))
+    
+    # Apply only to nose region
+    result = cv2.bitwise_and(result, result, mask=mask)
+    image = cv2.bitwise_and(image, image, mask=~mask)
+    result = cv2.add(image, result)
+    
+    return result
+
+def apply_combined_enhancement(image, intensity=0.35):
+    """Apply all effects with reduced intensity."""
+    result = image.copy()
+    result = apply_natural_refinement(result)
+    result = apply_bridge_reduction(result)
+    result = apply_tip_refinement(result)
+    result = apply_nose_narrowing(result)
+    result = apply_crooked_correction(result)
+    return result
+
 def decode_image(image_data):
     """Decode base64 image data to OpenCV format."""
     try:
@@ -145,28 +357,23 @@ def process_with_vertex_ai(image, effect):
             }
         )
         
-        # Process the response and apply modifications
-        # Note: In a real implementation, you would parse the response
-        # and apply the modifications using computer vision techniques
-        # For now, we'll return a slightly modified version of the original
-        modified_image = image.copy()
-        
-        # Apply subtle modifications based on the effect
+        # Apply the appropriate effect based on the selection
         if effect == "Natural Refinement":
-            modified_image = cv2.GaussianBlur(modified_image, (5, 5), 0)
+            result = apply_natural_refinement(image)
         elif effect == "Bridge Reduction":
-            modified_image = cv2.addWeighted(modified_image, 0.9, np.zeros_like(modified_image), 0.1, 0)
+            result = apply_bridge_reduction(image)
         elif effect == "Tip Refinement":
-            modified_image = cv2.detailEnhance(modified_image, sigma_s=10, sigma_r=0.15)
+            result = apply_tip_refinement(image)
         elif effect == "Nose Narrowing":
-            modified_image = cv2.edgePreservingFilter(modified_image, flags=1, sigma_s=60, sigma_r=0.4)
+            result = apply_nose_narrowing(image)
         elif effect == "Crooked Correction":
-            modified_image = cv2.bilateralFilter(modified_image, 9, 75, 75)
+            result = apply_crooked_correction(image)
         elif effect == "Combined Enhancement":
-            modified_image = cv2.detailEnhance(modified_image, sigma_s=10, sigma_r=0.15)
-            modified_image = cv2.edgePreservingFilter(modified_image, flags=1, sigma_s=60, sigma_r=0.4)
+            result = apply_combined_enhancement(image)
+        else:
+            result = image
         
-        return modified_image
+        return result
         
     except Exception as e:
         raise ValueError(f"Error processing with Vertex AI: {str(e)}")
