@@ -9,7 +9,8 @@ import io
 
 # Add the project root directory to the Python path
 project_root = os.path.dirname(os.path.abspath(__file__))
-sys.path.insert(0, project_root)
+if project_root not in sys.path:
+    sys.path.insert(0, project_root)
 
 # Import functions from src.app
 from src.app import (
