@@ -28,13 +28,6 @@ CORS(app)
 # Register the API blueprint
 app.register_blueprint(api_bp, url_prefix='/api')
 
-# Set up Streamlit page config
-st.set_page_config(
-    page_title="AI Rhinoplasty Simulator",
-    page_icon="👃",
-    layout="wide"
-)
-
 # Rhinoplasty options
 RHINOPLASTY_OPTIONS = {
     "Natural Refinement": {
